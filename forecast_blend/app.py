@@ -71,6 +71,7 @@ def app(gsps: List[int] = None):
             )
 
             # make Forecast SQL
+            assert len(forecast_values) > 0, "No forecast values made"
             forecast = make_forecast(
                 forecast_values=forecast_values,
                 location=location,
@@ -84,6 +85,9 @@ def app(gsps: List[int] = None):
         # - forecast_value_last_seven_days
         # - forecast_value
         # tables, as we will end up doubling the size of this table.
+        assert len(forecasts) > 0, "No forecasts made"
+        assert len(forecasts[0].forecast_values) > 0,   "No forecast values sql made"
+        logger.debug(f"Saving {len(forecasts[0].forecast_values)} forecast values to latest table for blended model")
         update_all_forecast_latest(
             forecasts=forecasts,
             session=session,
@@ -113,7 +117,7 @@ def make_forecast(
     """
 
     forecast_values_sql = []
-    for i, forecast_value in forecast_values:
+    for forecast_value in forecast_values:
 
         forecast_value_sql = forecast_value.to_orm()
         forecast_values_sql.append(forecast_value_sql)
@@ -123,7 +127,7 @@ def make_forecast(
         forecast_creation_time=datetime.now(tz=timezone.utc),
         location=location,
         input_data_last_updated=input_data_last_updated,
-        forecast_values=forecast_values,
+        forecast_values=forecast_values_sql,
         historic=False,
     )
 

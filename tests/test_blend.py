@@ -1,12 +1,11 @@
 import logging
 from datetime import datetime, timezone, timedelta
 
+from blend import get_blend_forecast_values_latest
 from freezegun import freeze_time
-
 from nowcasting_datamodel.fake import make_fake_forecasts
 from nowcasting_datamodel.models.forecast import ForecastValueLatestSQL, ForecastValueSevenDaysSQL
 from nowcasting_datamodel.read.read import get_model
-from blend import get_blend_forecast_values_latest
 
 logger = logging.getLogger(__name__)
 

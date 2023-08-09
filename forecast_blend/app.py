@@ -8,16 +8,11 @@ For each GSP
 """
 
 import os
-import structlog
 from datetime import datetime, timedelta, timezone
 from typing import List
-from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
+
+import structlog
 from nowcasting_datamodel.connection import DatabaseConnection
-from nowcasting_datamodel.read.read import (
-    get_latest_input_data_last_updated,
-    get_location,
-    get_model,
-)
 from nowcasting_datamodel.models import (
     ForecastValue,
     ForecastSQL,
@@ -25,10 +20,15 @@ from nowcasting_datamodel.models import (
     LocationSQL,
     InputDataLastUpdatedSQL,
 )
+from nowcasting_datamodel.read.read import (
+    get_latest_input_data_last_updated,
+    get_location,
+    get_model,
+)
+from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
-from weights import weights
 from blend import get_blend_forecast_values_latest
-
+from weights import weights
 
 logger = structlog.stdlib.get_logger()
 
@@ -86,8 +86,10 @@ def app(gsps: List[int] = None):
         # - forecast_value
         # tables, as we will end up doubling the size of this table.
         assert len(forecasts) > 0, "No forecasts made"
-        assert len(forecasts[0].forecast_values) > 0,   "No forecast values sql made"
-        logger.debug(f"Saving {len(forecasts[0].forecast_values)} forecast values to latest table for blended model")
+        assert len(forecasts[0].forecast_values) > 0, "No forecast values sql made"
+        logger.debug(
+            f"Saving {len(forecasts[0].forecast_values)} forecast values to latest table for blended model"
+        )
         update_all_forecast_latest(
             forecasts=forecasts,
             session=session,
@@ -97,7 +99,7 @@ def app(gsps: List[int] = None):
 
         # future save to forecast_value_last_seven_days, but remove anything made in the
         # last within the last 30 minute period. This is because when loading the X hour forecast, only the latest
-        #  value in that settlement period is loaded. 
+        #  value in that settlement period is loaded.
 
 
 def make_forecast(

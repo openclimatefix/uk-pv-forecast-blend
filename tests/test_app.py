@@ -1,15 +1,14 @@
-from app import app
+import logging
 
+from app import app
+from nowcasting_datamodel.models import LocationSQL
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
     ForecastValueLatestSQL,
     ForecastValueSevenDaysSQL,
-    ForecastValueSQL
+    ForecastValueSQL,
 )
 
-from nowcasting_datamodel.models import LocationSQL
-
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -27,15 +26,11 @@ def test_app(db_session, forecasts):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 23 * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 23 * 16
 
-    app(gsps=list(range(0,11)))
+    app(gsps=list(range(0, 11)))
 
     assert len(db_session.query(ForecastValueSQL).all()) == 23 * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 23 * 16
 
     # now added blend model
     assert len(db_session.query(ForecastSQL).all()) == 46 + 11
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == (23+11) * 16
-
-
-
-
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == (23 + 11) * 16

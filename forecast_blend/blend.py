@@ -12,9 +12,10 @@ from typing import List, Optional
 
 import pandas as pd
 import structlog
+from nowcasting_datamodel.models.forecast import ForecastValue, ForecastValueSevenDaysSQL
+from nowcasting_datamodel.read.read import get_forecast_values, get_forecast_values_latest
 from sqlalchemy.orm.session import Session
 
-from nowcasting_datamodel.models.forecast import ForecastValue, ForecastValueSevenDaysSQL
 from utils import (
     blend_forecasts_together,
     check_forecast_created_utc,
@@ -22,7 +23,6 @@ from utils import (
     convert_list_forecast_values_to_df,
 )
 from weights import make_weights_df
-from nowcasting_datamodel.read.read import get_forecast_values, get_forecast_values_latest
 
 logger = structlog.stdlib.get_logger()
 

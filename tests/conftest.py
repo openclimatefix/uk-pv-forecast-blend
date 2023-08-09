@@ -1,13 +1,9 @@
 import os
-from typing import List
-
-import pytest
 from datetime import datetime, timedelta
 
+import pytest
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts
-from nowcasting_datamodel.models.forecast import ForecastSQL
-from nowcasting_datamodel.models import MLModelSQL
 from nowcasting_datamodel.save.save import save
 from testcontainers.postgres import PostgresContainer
 

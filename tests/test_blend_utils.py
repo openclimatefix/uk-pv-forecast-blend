@@ -1,8 +1,8 @@
-import numpy as np
-
-from utils import convert_df_to_list_forecast_values
-import pandas as pd
 from datetime import datetime, timezone
+
+import numpy as np
+import pandas as pd
+from utils import convert_df_to_list_forecast_values
 
 
 def test_convert_df_to_list_forecast_values():

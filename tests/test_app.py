@@ -7,7 +7,6 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL
 )
 
-from freezegun import freeze_time
 from nowcasting_datamodel.models import LocationSQL
 
 import logging

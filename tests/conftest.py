@@ -2,7 +2,7 @@ import os
 from typing import List
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts
@@ -14,7 +14,9 @@ from testcontainers.postgres import PostgresContainer
 
 @pytest.fixture
 def forecasts(db_session):
-    t0_datetime_utc = datetime.utcnow()
+    t0_datetime_utc = datetime.utcnow() + timedelta(days=2)
+    # time detal of 2 days is used as fake forecast are made 2 days in the past,
+    # this makes them for now
     # create
     for model_name in ["cnn", "pvnet_v2", "National_xg"]:
 

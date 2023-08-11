@@ -6,7 +6,6 @@ ARG TESTING=0
 ARG GIT_PYTHON_REFRESH=quiet
 
 # copy files
-COPY setup.py app/setup.py
 COPY readme.md app/readme.md
 COPY requirements.txt app/requirements.txt
 
@@ -21,7 +20,7 @@ COPY tests/ app/tests/
 WORKDIR /app
 
 # install library
-RUN pip install -r app/requirements.txt
+RUN export PYTHONPATH=${PYTHONPATH}:./forecast_blend
 
 RUN if [ "$TESTING" = 1 ]; then pip install pytest pytest-cov coverage; fi
 

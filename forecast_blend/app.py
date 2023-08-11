@@ -63,7 +63,7 @@ def app(gsps: List[int] = None):
             # 1. and 2. load and blend forecast values together
             forecast_values = get_blend_forecast_values_latest(
                 session=session,
-                gsp_id=0,
+                gsp_id=gsp_id,
                 start_datetime=start_datetime,
                 properties_model="National_xg",
                 weights=weights,
@@ -134,6 +134,5 @@ def make_forecast(
     )
 
 
-# TODO check
-if __name__ == "main":
-    app()
+if __name__ == "__main__":
+    app(list(range(0,10)))

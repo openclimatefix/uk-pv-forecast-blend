@@ -7,7 +7,7 @@ ARG GIT_PYTHON_REFRESH=quiet
 
 # copy files
 COPY setup.py app/setup.py
-COPY README.md app/README.md
+COPY readme.md app/readme.md
 COPY requirements.txt app/requirements.txt
 
 # install requirements
@@ -21,7 +21,7 @@ COPY tests/ app/tests/
 WORKDIR /app
 
 # install library
-RUN pip install -e .
+RUN pip install -r app/requirements.txt
 
 RUN if [ "$TESTING" = 1 ]; then pip install pytest pytest-cov coverage; fi
 

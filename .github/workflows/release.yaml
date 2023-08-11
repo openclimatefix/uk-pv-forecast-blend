@@ -8,3 +8,5 @@ jobs:
     uses: openclimatefix/.github/.github/workflows/docker-release.yml@v1.7.2
     secrets:
       PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+    with:
+      image_base_name: uk_pv_forecast_blend

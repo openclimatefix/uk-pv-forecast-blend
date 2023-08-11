@@ -1,0 +1,17 @@
+name: Python tests
+
+on:
+  push:
+  schedule:
+    - cron: "0 12 * * 1"
+jobs:
+  call-run-python-tests:
+    uses: openclimatefix/.github/.github/workflows/python-test.yml@main
+    with:
+      # pytest-cov looks at this folder
+      pytest_cov_dir: "forecast_blend"
+      # extra things to install
+      sudo_apt_install: ""
+      #      brew_install: "proj geos librttopo"
+      os_list: '["ubuntu-latest"]'
+      python_path: "./forecast_blend"

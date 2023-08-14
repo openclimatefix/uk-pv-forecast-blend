@@ -135,4 +135,4 @@ def make_forecast(
 
 
 if __name__ == "__main__":
-    app(list(range(0,10)))
+    app()

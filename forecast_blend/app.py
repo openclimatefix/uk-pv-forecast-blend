@@ -122,6 +122,7 @@ def make_forecast(
     for forecast_value in forecast_values:
 
         forecast_value_sql = forecast_value.to_orm()
+        forecast_values_sql.properties = forecast_value._properties
         forecast_values_sql.append(forecast_value_sql)
 
     return ForecastSQL(

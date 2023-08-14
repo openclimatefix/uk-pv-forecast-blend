@@ -28,7 +28,7 @@ def check_forecast_created_utc(forecast_values_all_model) -> List[Union[str, Lis
     forecast_values_all_model_valid = []
     for model_name, forecast_values_one_model in forecast_values_all_model:
         one_forecast_created_within_timedelta = forecast_values_one_model[
-            0
+            -1
         ].created_utc < datetime.now(timezone.utc) - timedelta(hours=2)
 
         if one_forecast_created_within_timedelta:

@@ -107,14 +107,16 @@ def get_blend_forecast_values_latest(
     forecast_values_blended = blend_forecasts_together(forecast_values_all_model, weights_df)
 
     # add properties
-    forecast_values_df = add_properties_to_forecast_values(
-        blended_df=forecast_values_blended,
-        properties_model=properties_model,
-        all_model_df=forecast_values_all_model,
-    )
+    if gsp_id == 0:
+        # currently only blend for national
+        forecast_values_blended = add_properties_to_forecast_values(
+            blended_df=forecast_values_blended,
+            properties_model=properties_model,
+            all_model_df=forecast_values_all_model,
+        )
 
     # convert back to list of forecast values
-    forecast_values = convert_df_to_list_forecast_values(forecast_values_df)
+    forecast_values = convert_df_to_list_forecast_values(forecast_values_blended)
 
     return forecast_values
 

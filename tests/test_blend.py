@@ -50,18 +50,18 @@ weights_three_models = [
 def test_get_blend_forecast_values_latest_one_model(db_session):
     model = get_model(session=db_session, name="test_1", version="0.0.1")
 
-    f1 = make_fake_forecasts(gsp_ids=[1, 2], session=db_session)
+    f1 = make_fake_forecasts(gsp_ids=[0, 1], session=db_session)
     f1[0].historic = True
     f1[0].forecast_values_latest = [
         ForecastValueLatestSQL(
-            gsp_id=1,
+            gsp_id=0,
             expected_power_generation_megawatts=1,
             target_time=datetime(2023, 1, 1, tzinfo=timezone.utc),
             model_id=model.id,
             properties={"10": 0.9, "90": 1.1},
         ),
         ForecastValueLatestSQL(
-            gsp_id=1,
+            gsp_id=0,
             expected_power_generation_megawatts=1,
             target_time=datetime(2023, 1, 1, 0, 30, tzinfo=timezone.utc),
             model_id=model.id,
@@ -93,18 +93,18 @@ def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
 
     for model in [model_1, model_2]:
-        f1 = make_fake_forecasts(gsp_ids=[1, 2], session=db_session)
+        f1 = make_fake_forecasts(gsp_ids=[0, 1], session=db_session)
         f1[0].historic = True
         f1[0].forecast_values_latest = [
             ForecastValueLatestSQL(
-                gsp_id=1,
+                gsp_id=0,
                 expected_power_generation_megawatts=1,
                 target_time=datetime(2023, 1, 1, tzinfo=timezone.utc),
                 model_id=model.id,
                 properties={"10": 0.9, "90": 1.1},
             ),
             ForecastValueLatestSQL(
-                gsp_id=1,
+                gsp_id=0,
                 expected_power_generation_megawatts=2,
                 target_time=datetime(2023, 1, 1, 0, 30, tzinfo=timezone.utc),
                 model_id=model.id,
@@ -139,7 +139,7 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
 
     forecasts = {}
     for model in [model_1, model_2, model_3]:
-        f1 = make_fake_forecasts(gsp_ids=[1, 2], session=db_session)
+        f1 = make_fake_forecasts(gsp_ids=[0, 1], session=db_session)
         f1[0].historic = True
 
         if model == model_1:
@@ -163,7 +163,7 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
 
         f1[0].forecast_values_latest = [
             ForecastValueLatestSQL(
-                gsp_id=1,
+                gsp_id=0,
                 expected_power_generation_megawatts=power,
                 target_time=datetime(2023, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=t),
                 model_id=model.id,
@@ -221,7 +221,7 @@ def test_get_blend_forecast_values_two_models_plevel_second(db_session):
 
     forecasts = {}
     for model in [model_1, model_2]:
-        f1 = make_fake_forecasts(gsp_ids=[1, 2], session=db_session)
+        f1 = make_fake_forecasts(gsp_ids=[0, 1], session=db_session)
         f1[0].historic = True
 
         if model == model_1:
@@ -239,7 +239,7 @@ def test_get_blend_forecast_values_two_models_plevel_second(db_session):
 
         f1[0].forecast_values_latest = [
             ForecastValueLatestSQL(
-                gsp_id=1,
+                gsp_id=0,
                 expected_power_generation_megawatts=power,
                 target_time=datetime(2023, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=t),
                 model_id=model.id,
@@ -297,7 +297,7 @@ def test_get_blend_forecast_values_latest_negative(db_session):
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
 
     for model in [model_1, model_2]:
-        f1 = make_fake_forecasts(gsp_ids=[1, 2], session=db_session)
+        f1 = make_fake_forecasts(gsp_ids=[0, 1], session=db_session)
         f1[0].historic = True
 
         if model == model_1:
@@ -310,7 +310,7 @@ def test_get_blend_forecast_values_latest_negative(db_session):
         forecast_horizon_minutes = [0, 30, 8 * 30, 15 * 30]
         f1[0].forecast_values_latest = [
             ForecastValueLatestSQL(
-                gsp_id=1,
+                gsp_id=0,
                 expected_power_generation_megawatts=power,
                 target_time=datetime(2023, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=t),
                 model_id=model.id,

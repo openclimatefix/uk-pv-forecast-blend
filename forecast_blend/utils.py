@@ -54,6 +54,7 @@ def convert_list_forecast_values_to_df(forecast_values_all_model_valid):
      - "adjust_mw",
      - "created_utc",
      - "model_name",
+     - "gsp_id"
     """
     logger.debug(f"Getting values from {len(forecast_values_all_model_valid)} models")
     forecast_values_all_model_df = []
@@ -117,7 +118,10 @@ def convert_df_to_list_forecast_values(forecast_values_blended: pd.DataFrame):
             expected_power_generation_megawatts=expected_power_generation_megawatts,
         )
         forecast_value._adjust_mw = row.adjust_mw
-        forecast_value._properties = row.properties
+
+        if hasattr(row, "properties"):
+            forecast_value._properties = row.properties
+
         forecast_values.append(forecast_value)
     return forecast_values
 

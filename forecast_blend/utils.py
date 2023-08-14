@@ -20,24 +20,24 @@ def check_forecast_created_utc(forecast_values_all_model) -> List[Union[str, Lis
     :param forecast_values_all_model: list of forecast
     :return: list of valid forecasts
     """
-    one_forecast_created_within_timedelta = False
+    one_forecast_created_within_timedelta = True
 
     # if all forecasts are later than 2 hours, then we use the blend,
     # otherwise we only use forecast less than 2 hours
-    if one_forecast_created_within_timedelta:
-        # remove all forecasts that are older than 2 hours
-        forecast_values_all_model_valid = []
-        for model_name, forecast_values_one_model in forecast_values_all_model:
-            one_forecast_created_within_timedelta = forecast_values_one_model[
-                0
-            ].created_utc < datetime.now(timezone.utc) - timedelta(hours=2)
+    # remove all forecasts that are older than 2 hours
+    forecast_values_all_model_valid = []
+    for model_name, forecast_values_one_model in forecast_values_all_model:
+        one_forecast_created_within_timedelta = forecast_values_one_model[
+            0
+        ].created_utc < datetime.now(timezone.utc) - timedelta(hours=2)
 
-            if one_forecast_created_within_timedelta:
-                logger.debug(f"Will be using forecast {model_name} " f"as it is newer than 2 hours")
-                forecast_values_all_model_valid.append([model_name, forecast_values_one_model])
-            else:
-                logger.debug(f"forecast {model_name} is older than 2 hours, so not using it")
-    else:
+        if one_forecast_created_within_timedelta:
+            logger.debug(f"Will be using forecast {model_name} " f"as it is newer than 2 hours")
+            forecast_values_all_model_valid.append([model_name, forecast_values_one_model])
+        else:
+            logger.debug(f"forecast {model_name} is older than 2 hours, so not using it")
+
+    if len(forecast_values_all_model_valid) == 0:
         # use all forecast:
         logger.debug("using all forecasts as all are older than 2 hours")
         forecast_values_all_model_valid = forecast_values_all_model

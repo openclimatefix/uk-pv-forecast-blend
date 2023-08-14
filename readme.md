@@ -10,6 +10,12 @@ The main application (forecast_blend/app.py)
 
 This was previously done in the API
 
+# Details
+
+- Note we only blend forecasts if they are made within 2 hours. 
+If all forecasts are older than this, then all forecasts are used.
+- Currently the probablistics forecasts come from national_xg model. 
+
 # Tests
 
 Tests are in the tests folder and can be run using pytest

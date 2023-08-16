@@ -27,15 +27,21 @@ def check_forecast_created_utc(forecast_values_all_model) -> List[Union[str, Lis
     # remove all forecasts that are older than 2 hours
     forecast_values_all_model_valid = []
     for model_name, forecast_values_one_model in forecast_values_all_model:
-        one_forecast_created_within_timedelta = forecast_values_one_model[
-            -1
-        ].created_utc < datetime.now(timezone.utc) - timedelta(hours=2)
+
+        one_forecast_created = forecast_values_one_model[-1].created_utc
+
+        one_forecast_created_within_timedelta = one_forecast_created > datetime.now(
+            timezone.utc
+        ) - timedelta(hours=2)
 
         if one_forecast_created_within_timedelta:
-            logger.debug(f"Will be using forecast {model_name} " f"as it is newer than 2 hours")
+            logger.debug(
+                f"Will be using forecast {model_name} "
+                f"as it is newer than 2 hours ({one_forecast_created=})"
+            )
             forecast_values_all_model_valid.append([model_name, forecast_values_one_model])
         else:
-            logger.debug(f"forecast {model_name} is older than 2 hours, so not using it")
+            logger.debug(f"forecast {model_name} is older than 2 hours, so not using it ({one_forecast_created=}")
 
     if len(forecast_values_all_model_valid) == 0:
         # use all forecast:

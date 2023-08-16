@@ -32,7 +32,7 @@ from weights import weights
 
 logger = structlog.stdlib.get_logger()
 
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 
 
 def app(gsps: List[int] = None):

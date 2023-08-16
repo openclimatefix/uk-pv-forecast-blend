@@ -39,7 +39,7 @@ def app(gsps: List[int] = None):
     """run main app"""
 
     if gsps is None:
-        gsps = range(0, N_GSP)
+        gsps = range(0, N_GSP+1)
 
     # make connection to database
     connection = DatabaseConnection(url=os.getenv("DB_URL", "not_set"))

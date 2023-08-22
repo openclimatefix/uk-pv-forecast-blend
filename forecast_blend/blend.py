@@ -173,6 +173,10 @@ def add_properties_to_forecast_values(
     properties_only_df = pd.json_normalize(blended_df["properties"])
     for c in properties_only_df.columns:
         properties_only_df[c] += blended_df["expected_power_generation_megawatts"]
+        
+        # and round to 2 decimal places
+        properties_only_df[c] = properties_only_df[c].round(2)
+
     blended_df["properties"] = properties_only_df.apply(lambda x: json.loads(x.to_json()), axis=1)
 
     assert "properties" in blended_df.columns

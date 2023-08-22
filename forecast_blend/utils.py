@@ -121,12 +121,13 @@ def convert_df_to_list_forecast_values(forecast_values_blended: pd.DataFrame):
 
         # round to 2 d.p.
         expected_power_generation_megawatts = round(expected_power_generation_megawatts, 2)
+        adjust_mw = round(row.adjust_mw, 2)
 
         forecast_value = ForecastValue(
             target_time=row.target_time,
             expected_power_generation_megawatts=expected_power_generation_megawatts,
         )
-        forecast_value._adjust_mw = row.adjust_mw
+        forecast_value._adjust_mw = adjust_mw
 
         if hasattr(row, "properties"):
             forecast_value._properties = row.properties

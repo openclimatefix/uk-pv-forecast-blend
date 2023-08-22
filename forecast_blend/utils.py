@@ -119,6 +119,9 @@ def convert_df_to_list_forecast_values(forecast_values_blended: pd.DataFrame):
         if expected_power_generation_megawatts < 0:
             expected_power_generation_megawatts = 0
 
+        # round to 2 d.p.
+        expected_power_generation_megawatts = round(expected_power_generation_megawatts, 2)
+
         forecast_value = ForecastValue(
             target_time=row.target_time,
             expected_power_generation_megawatts=expected_power_generation_megawatts,

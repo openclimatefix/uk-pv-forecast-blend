@@ -25,6 +25,7 @@ from nowcasting_datamodel.read.read import (
     get_location,
     get_model,
 )
+from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from blend import get_blend_forecast_values_latest
@@ -39,10 +40,10 @@ def app(gsps: List[int] = None):
     """run main app"""
 
     if gsps is None:
-        gsps = range(0, N_GSP+1)
+        gsps = range(0, N_GSP + 1)
 
     # make connection to database
-    connection = DatabaseConnection(url=os.getenv("DB_URL", "not_set"))
+    connection = DatabaseConnection(url=os.getenv("DB_URL", "not_set"), echo=False)
 
     # get utc now minus 1 hour, for the start time of these blending
     start_datetime = datetime.now(tz=timezone.utc) - timedelta(hours=1)
@@ -85,22 +86,21 @@ def app(gsps: List[int] = None):
         # - forecast_value_last_seven_days
         # - forecast_value
         # tables, as we will end up doubling the size of this table.
-        session.add_all(forecasts)
         assert len(forecasts) > 0, "No forecasts made"
         assert len(forecasts[0].forecast_values) > 0, "No forecast values sql made"
-        logger.debug(
-            f"Saving {len(forecasts[0].forecast_values)} forecast values to latest table for blended model"
-        )
-        update_all_forecast_latest(
-            forecasts=forecasts,
-            session=session,
-            update_national=True,
-            update_gsp=True,
-        )
-
-        # future save to forecast_value_last_seven_days, but remove anything made in the
-        # last within the last 30 minute period. This is because when loading the X hour forecast, only the latest
-        #  value in that settlement period is loaded.
+        if is_last_forecast_made_before_last_30_minutes_step(session=session):
+            logger.debug(f"Saving {len(forecasts)} forecasts")
+            save(session=session, forecasts=forecasts, apply_adjuster=False)
+        else:
+            logger.debug(
+                f"Saving {len(forecasts[0].forecast_values)} forecast values to latest table for blended model"
+            )
+            update_all_forecast_latest(
+                forecasts=forecasts,
+                session=session,
+                update_national=True,
+                update_gsp=True,
+            )
 
 
 def make_forecast(
@@ -137,6 +137,48 @@ def make_forecast(
         forecast_values=forecast_values_sql,
         historic=False,
     )
+
+
+def is_last_forecast_made_before_last_30_minutes_step(session):
+    """
+    Save the forecast to the database every 30 minutes
+
+    This is beasue if we ran this evyer time, there would be double the about of
+    Forecast, ForecastValues and ForecastValluesLastSevenDays
+    """
+
+    query = session.query(ForecastSQL)
+    query = query.join(MLModelSQL)
+    query = query.filter(MLModelSQL.name == "blend")
+    query = query.filter(ForecastSQL.historic == False)
+    query = query.order_by(ForecastSQL.forecast_creation_time.desc())
+    last_forecast = query.limit(1).all()
+
+    update_forecasts = False
+    if len(last_forecast) == 0:
+        logger.debug("Could not find any forecasts so will be saving full forecast")
+        update_forecasts = True
+    else:
+
+        last_forecast = last_forecast[0]
+
+        # round down to the nearest 30 minutes
+        limit_creation_time = datetime.now(tz=timezone.utc).replace(second=0, microsecond=0)
+        limit_creation_time = limit_creation_time - timedelta(
+            minutes=limit_creation_time.minute % 30
+        )
+        creation_time = last_forecast.forecast_creation_time
+        if creation_time < limit_creation_time:
+            logger.debug(
+                f"Last forecast was made at {creation_time} so will be saving full forecast"
+            )
+            update_forecasts = True
+        else:
+            logger.info(
+                f"Not updating forecasts as they have been updated recently ({creation_time})"
+            )
+
+    return update_forecasts
 
 
 if __name__ == "__main__":

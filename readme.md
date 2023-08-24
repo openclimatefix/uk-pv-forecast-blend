@@ -10,6 +10,9 @@ The main application (forecast_blend/app.py)
 
 This was previously done in the API
 
+We always update the ForecastValueLatest table, 
+but we only update the ForecastValue table every 30 minutes
+
 # Details
 
 - Note we only blend forecasts if they are made within 2 hours. 

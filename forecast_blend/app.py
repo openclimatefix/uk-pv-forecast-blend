@@ -85,6 +85,7 @@ def app(gsps: List[int] = None):
         # - forecast_value_last_seven_days
         # - forecast_value
         # tables, as we will end up doubling the size of this table.
+        session.add_all(forecasts)
         assert len(forecasts) > 0, "No forecasts made"
         assert len(forecasts[0].forecast_values) > 0, "No forecast values sql made"
         logger.debug(

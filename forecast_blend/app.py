@@ -51,7 +51,9 @@ def app(gsps: List[int] = None):
     if start_datetime.minute < 30:
         start_datetime = start_datetime.replace(minute=30, second=0, microsecond=0)
     else:
-        start_datetime = start_datetime.replace(hour=start_datetime.hour + 1, minute=0, second=0, microsecond=0)
+        start_datetime = start_datetime.replace(
+            hour=start_datetime.hour + 1, minute=0, second=0, microsecond=0
+        )
 
     with connection.get_session() as session:
 

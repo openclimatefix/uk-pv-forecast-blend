@@ -107,6 +107,7 @@ def make_weights_df(
         # add the first weight to the dataframe, from  start_datetime to start_datetime_now.
         # This could be for the two days before now
         if i == 0:
+            logger.debug(f"Making weights for {start_datetime} to {start_datetime_now} of {start_weight}")
             weights_df = pd.DataFrame(
                 index=pd.date_range(start=start_datetime, end=start_datetime_now, freq="30min")
             )

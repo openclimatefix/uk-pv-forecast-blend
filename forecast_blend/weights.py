@@ -46,7 +46,7 @@ weights = [
     {
         # National_xg
         "start_horizon_hour": 8,
-        "end_horizon_hour": 9,
+        "end_horizon_hour": 36,
         "start_weight": [0, 1, 0],
         "end_weight": [0, 1, 0],
     },

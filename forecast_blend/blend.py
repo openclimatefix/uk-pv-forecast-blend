@@ -34,7 +34,6 @@ def get_blend_forecast_values_latest(
     model_names: Optional[List[str]] = None,
     weights: Optional[List[float]] = None,
     forecast_horizon_minutes: Optional[int] = None,
-    properties_model: Optional[str] = None,
 ) -> List[ForecastValue]:
     """
     Get forecast values
@@ -45,7 +44,7 @@ def get_blend_forecast_values_latest(
         If None is given then all are returned.
     :param model_names: list of model names to use for blending
     :param weights: list of weights to use for blending, see structure in make_weights_df
-    :param properties_model: the model to use for the properties
+    :param forecast_horizon_minutes: The forecast horizon to blend together
 
     return: List of forecasts values blended from different models
     """
@@ -60,11 +59,6 @@ def get_blend_forecast_values_latest(
         )
     else:
         weights_df = None
-
-    if properties_model is not None:
-        assert (
-            properties_model in model_names
-        ), f"properties_model must be in model_names {model_names}"
 
     # get forecast for the different models
     forecast_values_all_model = []
@@ -111,8 +105,8 @@ def get_blend_forecast_values_latest(
         # currently only blend for national
         forecast_values_blended = add_properties_to_forecast_values(
             blended_df=forecast_values_blended,
-            properties_model=properties_model,
             all_model_df=forecast_values_all_model,
+            weights_df=weights_df,
         )
 
     # convert back to list of forecast values
@@ -124,7 +118,7 @@ def get_blend_forecast_values_latest(
 def add_properties_to_forecast_values(
     blended_df: pd.DataFrame,
     all_model_df: pd.DataFrame,
-    properties_model: Optional[str] = None,
+    weights_df: pd.DataFrame,
 ):
     """
     Add properties to blended forecast values, we just take it from one model.
@@ -134,51 +128,44 @@ def add_properties_to_forecast_values(
     This makes sure that plevels 10 and 90 surround the blended value.
 
     :param blended_df: dataframe of blended forecast values
-    :param properties_model: which model to use for properties
     :param all_model_df: dataframe of all forecast values for all models
+    :param weights_df: dataframe of weights for each model
     :return:
     """
 
     logger.debug(
-        f"Adding properties to blended forecast values for properties_model {properties_model}"
+        f"Adding properties to blended forecast values"
     )
+    all_model_df.reset_index(inplace=True, drop=True)
 
-    if properties_model is None:
-        blended_df["properties"] = None
-        return blended_df
+    # get properties out of json
+    properties_only_df = pd.json_normalize(all_model_df["properties"])
+    properties_only_df = pd.concat([all_model_df[['target_time', 'model_name', 'adjust_mw']], properties_only_df], axis=1)
+    properties_only_df.reset_index(inplace=True, drop=True)
 
-    # get properties
+    logger.debug(f"properties_only_df {properties_only_df}")
 
-    properties_df = all_model_df[all_model_df["model_name"] == properties_model]
-    properties_df.reset_index(inplace=True, drop=True)
+    assert 'target_time' in properties_only_df.columns, f'target_time must be in properties_only_df {properties_only_df.columns}'
 
-    # adjust "properties" to be relative to the expected_power_generation_megawatts
-    # this is a bit tricky becasue the "properties" column is a list of dictionaries
-    # below we add "expected_power_generation_megawatts" value back to this.
-    # We do this so that plevels are relative to the blended values.
-    properties_only_df = pd.json_normalize(properties_df["properties"])
-    for c in properties_only_df.columns:
-        properties_only_df[c] -= properties_df["expected_power_generation_megawatts"]
-    properties_df["properties"] = properties_only_df.apply(
-        lambda x: json.loads(x.to_json()), axis=1
-    )
-
-    # reduce columns
-    properties_df = properties_df[["target_time", "properties"]]
+    # blend together the p values
+    blended_on_p_values = None
+    for p_level in ['10','90']:
+        variable_to_blend = f'{p_level}'
+        blended_on_p_value = blend_forecasts_together(properties_only_df, weights_df, variable_to_blend=variable_to_blend)
+        blended_on_p_value = blended_on_p_value[['target_time', variable_to_blend]]
+        if blended_on_p_values is None:
+            blended_on_p_values = blended_on_p_value
+        else:
+            blended_on_p_values = blended_on_p_values.merge(blended_on_p_value, on='target_time', how='outer')
 
     # add properties to blended forecast values
-    blended_df = blended_df.merge(properties_df, on=["target_time"], how="left")
+    logger.debug(f"{blended_on_p_values}")
+    blended_df = blended_df.merge(blended_on_p_values, on=["target_time"], how="left")
 
-    # add "expected_power_generation_megawatts" to the properties
-    properties_only_df = pd.json_normalize(blended_df["properties"])
-    for c in properties_only_df.columns:
-        properties_only_df[c] += blended_df["expected_power_generation_megawatts"]
-        
-        # and round to 2 decimal places
-        properties_only_df[c] = properties_only_df[c].round(2)
+    # format plevels back to dict
+    blended_df["properties"] = blended_df[['10','90']].apply(lambda x: json.loads(x.to_json()), axis=1)
 
-    blended_df["properties"] = properties_only_df.apply(lambda x: json.loads(x.to_json()), axis=1)
-
-    assert "properties" in blended_df.columns
+    # drop columns '10' and '90
+    blended_df.drop(columns=['10','90'], inplace=True)
 
     return blended_df

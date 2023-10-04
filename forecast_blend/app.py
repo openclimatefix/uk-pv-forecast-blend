@@ -73,7 +73,6 @@ def app(gsps: List[int] = None):
                 session=session,
                 gsp_id=gsp_id,
                 start_datetime=start_datetime,
-                properties_model="National_xg",
                 weights=weights,
                 model_names=["cnn", "National_xg", "pvnet_v2"],
             )

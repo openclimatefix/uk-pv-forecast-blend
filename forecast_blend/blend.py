@@ -133,39 +133,46 @@ def add_properties_to_forecast_values(
     :return:
     """
 
-    logger.debug(
-        f"Adding properties to blended forecast values"
-    )
+    logger.debug(f"Adding properties to blended forecast values")
     all_model_df.reset_index(inplace=True, drop=True)
 
     # get properties out of json
     properties_only_df = pd.json_normalize(all_model_df["properties"])
-    properties_only_df = pd.concat([all_model_df[['target_time', 'model_name', 'adjust_mw']], properties_only_df], axis=1)
+    properties_only_df = pd.concat(
+        [all_model_df[["target_time", "model_name", "adjust_mw"]], properties_only_df], axis=1
+    )
     properties_only_df.reset_index(inplace=True, drop=True)
 
     logger.debug(f"properties_only_df {properties_only_df}")
 
-    assert 'target_time' in properties_only_df.columns, f'target_time must be in properties_only_df {properties_only_df.columns}'
+    assert (
+        "target_time" in properties_only_df.columns
+    ), f"target_time must be in properties_only_df {properties_only_df.columns}"
 
     # blend together the p values
     blended_on_p_values = None
-    for p_level in ['10','90']:
-        variable_to_blend = f'{p_level}'
-        blended_on_p_value = blend_forecasts_together(properties_only_df, weights_df, variable_to_blend=variable_to_blend)
-        blended_on_p_value = blended_on_p_value[['target_time', variable_to_blend]]
+    for p_level in ["10", "90"]:
+        variable_to_blend = f"{p_level}"
+        blended_on_p_value = blend_forecasts_together(
+            properties_only_df, weights_df, variable_to_blend=variable_to_blend
+        )
+        blended_on_p_value = blended_on_p_value[["target_time", variable_to_blend]]
         if blended_on_p_values is None:
             blended_on_p_values = blended_on_p_value
         else:
-            blended_on_p_values = blended_on_p_values.merge(blended_on_p_value, on='target_time', how='outer')
+            blended_on_p_values = blended_on_p_values.merge(
+                blended_on_p_value, on="target_time", how="outer"
+            )
 
     # add properties to blended forecast values
-    logger.debug(f"{blended_on_p_values}")
     blended_df = blended_df.merge(blended_on_p_values, on=["target_time"], how="left")
 
     # format plevels back to dict
-    blended_df["properties"] = blended_df[['10','90']].apply(lambda x: json.loads(x.to_json()), axis=1)
+    blended_df["properties"] = blended_df[["10", "90"]].apply(
+        lambda x: json.loads(x.to_json()), axis=1
+    )
 
     # drop columns '10' and '90
-    blended_df.drop(columns=['10','90'], inplace=True)
+    blended_df.drop(columns=["10", "90"], inplace=True)
 
     return blended_df

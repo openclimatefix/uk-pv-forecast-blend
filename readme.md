@@ -19,6 +19,36 @@ but we only update the ForecastValue table every 30 minutes
 If all forecasts are older than this, then all forecasts are used.
 - Currently the probablistics forecasts come from national_xg model. 
 
+```mermaid
+  graph TD;
+      subgraph App
+      S(Start) --> LF
+      LF(Load All Forecasts);
+      LF --> Filter(Filter Forecasts);
+      Filter -->  Blend[Blend \n Expected values];
+      Blend --> N4(Blend Probabilistic \n- only for National);
+      N4 --> S(Save Forecast)
+      S --> F(Finish)
+      end
+      
+      subgraph Blending
+    A(All Forecasts);
+    W2(Weights);
+    A --> SUT(Split unique 'target times' \n and not);
+    SUT --> |Unique Target times| B
+    SUT --> |Duplicated Target times| C(Loop over each \n target time)
+    C --> BW
+    W2 --> BW
+    BW(Blend using weights) --> SumCheck
+    SumCheck{At least one \n forecast available} --> |yes| B
+    SumCheck --> |no| Blend2(Blend forecast with \n next set of weights)
+    Blend2 --> SumCheck2
+    SumCheck2{At least one \n forecast available} --> |yes| B
+    SumCheck2 --> |no| BB(Break)
+    B(Blended \n Forecast)
+    end
+```
+
 # Tests
 
 Tests are in the tests folder and can be run using pytest

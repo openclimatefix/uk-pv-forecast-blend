@@ -138,7 +138,7 @@ def add_p_levels_to_forecast_values(
 
     # get properties out of json
     properties_only_df = pd.json_normalize(all_model_df["properties"])
-    properties_only_df.rename(columns={'10':'plevel_10','90':'plevel_90'})
+    properties_only_df.rename(columns={'10':'plevel_10','90':'plevel_90'}, inplace=True)
     properties_only_df = pd.concat(
         [all_model_df[["target_time", "model_name", "adjust_mw"]], properties_only_df], axis=1
     )
@@ -170,7 +170,7 @@ def add_p_levels_to_forecast_values(
     blended_df = blended_df.merge(blended_on_p_values, on=["target_time"], how="left")
 
     # format plevels back to dict
-    properties_only_df.rename(columns={'plevel_10': '10', 'plevel_90': '90'})
+    properties_only_df.rename(columns={'plevel_10': '10', 'plevel_90': '90'}, inplace=True)
     blended_df["properties"] = blended_df[["10", "90"]].apply(
         lambda x: json.loads(x.to_json()), axis=1
     )

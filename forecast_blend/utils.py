@@ -136,7 +136,9 @@ def convert_df_to_list_forecast_values(forecast_values_blended: pd.DataFrame):
     return forecast_values
 
 
-def blend_forecasts_together(forecast_values_all_model, weights_df, variable_to_blend: str = "expected_power_generation_megawatts"):
+def blend_forecasts_together(forecast_values_all_model,
+                             weights_df,
+                             column_name_to_blend: str = "expected_power_generation_megawatts"):
     """
     Blend the forecasts together using the weights_df
 
@@ -144,7 +146,7 @@ def blend_forecasts_together(forecast_values_all_model, weights_df, variable_to_
         'expected_power_generation_megawatts', 'adjust_mw', 'model_name'
     :param weights_df: Dataframe of weights with columns of the model name,
         and index of target times
-    :param variable_to_blend: The variable to blend, either "expected_power_generation_megawatts"
+    :param column_name_to_blend: The variable to blend, either "expected_power_generation_megawatts"
     :return: Dataframe with the columns
         'target_time',
         'expected_power_generation_megawatts',
@@ -201,11 +203,11 @@ def blend_forecasts_together(forecast_values_all_model, weights_df, variable_to_
 
         # merge the forecast values and weights together
         forecast_values_one_target_time = forecast_values_one_target_time[
-            ["model_name", variable_to_blend, "adjust_mw", "weight"]
+            ["model_name", column_name_to_blend, "adjust_mw", "weight"]
         ]
 
         forecast_values_one_target_time_blend = blend_together_one_target_time(
-            forecast_values_one_target_time, target_time, variable_to_blend=variable_to_blend
+            forecast_values_one_target_time, target_time, variable_to_blend=column_name_to_blend
         )
 
         total_weights_used = forecast_values_one_target_time_blend["weight"].iloc[0]
@@ -247,7 +249,7 @@ def blend_forecasts_together(forecast_values_all_model, weights_df, variable_to_
 
                     # blend together
                     forecast_values_one_target_time_blend = blend_together_one_target_time(
-                        forecast_values_one_target_time, target_time, variable_to_blend
+                        forecast_values_one_target_time, target_time, column_name_to_blend
                     )
                     total_weights_used = forecast_values_one_target_time_blend["weight"].iloc[0]
 

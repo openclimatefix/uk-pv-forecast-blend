@@ -103,7 +103,7 @@ def get_blend_forecast_values_latest(
     # add properties
     if gsp_id == 0:
         # currently only blend for national
-        forecast_values_blended = add_properties_to_forecast_values(
+        forecast_values_blended = add_p_levels_to_forecast_values(
             blended_df=forecast_values_blended,
             all_model_df=forecast_values_all_model,
             weights_df=weights_df,
@@ -115,7 +115,7 @@ def get_blend_forecast_values_latest(
     return forecast_values
 
 
-def add_properties_to_forecast_values(
+def add_p_levels_to_forecast_values(
     blended_df: pd.DataFrame,
     all_model_df: pd.DataFrame,
     weights_df: pd.DataFrame,
@@ -138,6 +138,7 @@ def add_properties_to_forecast_values(
 
     # get properties out of json
     properties_only_df = pd.json_normalize(all_model_df["properties"])
+    properties_only_df.rename(columns={'10':'plevel_10','90':'plevel_90'})
     properties_only_df = pd.concat(
         [all_model_df[["target_time", "model_name", "adjust_mw"]], properties_only_df], axis=1
     )
@@ -151,12 +152,13 @@ def add_properties_to_forecast_values(
 
     # blend together the p values
     blended_on_p_values = None
-    for p_level in ["10", "90"]:
-        variable_to_blend = f"{p_level}"
+    for p_level in ["plevel_10", "plevel_90"]:
         blended_on_p_value = blend_forecasts_together(
-            properties_only_df, weights_df, variable_to_blend=variable_to_blend
+            properties_only_df, weights_df, column_name_to_blend=p_level
         )
-        blended_on_p_value = blended_on_p_value[["target_time", variable_to_blend]]
+        blended_on_p_value = blended_on_p_value[["target_time", p_level]]
+
+        # join all plevels back together in `blended_on_p_values`
         if blended_on_p_values is None:
             blended_on_p_values = blended_on_p_value
         else:
@@ -168,6 +170,7 @@ def add_properties_to_forecast_values(
     blended_df = blended_df.merge(blended_on_p_values, on=["target_time"], how="left")
 
     # format plevels back to dict
+    properties_only_df.rename(columns={'plevel_10': '10', 'plevel_90': '90'})
     blended_df["properties"] = blended_df[["10", "90"]].apply(
         lambda x: json.loads(x.to_json()), axis=1
     )

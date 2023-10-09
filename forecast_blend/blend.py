@@ -170,7 +170,7 @@ def add_p_levels_to_forecast_values(
     blended_df = blended_df.merge(blended_on_p_values, on=["target_time"], how="left")
 
     # format plevels back to dict
-    properties_only_df.rename(columns={'plevel_10': '10', 'plevel_90': '90'}, inplace=True)
+    blended_df.rename(columns={'plevel_10': '10', 'plevel_90': '90'}, inplace=True)
     blended_df["properties"] = blended_df[["10", "90"]].apply(
         lambda x: json.loads(x.to_json()), axis=1
     )

@@ -75,7 +75,6 @@ def test_get_blend_forecast_values_latest_one_model(db_session):
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         model_names=["test_1"],
-        properties_model="test_1",
     )
 
     assert len(forecast_values_read) == 2
@@ -119,7 +118,6 @@ def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         model_names=["test_1"],
-        properties_model="test_1",
     )
 
     assert len(forecast_values_read) == 2
@@ -183,7 +181,6 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2022, 12, 31, 0, 0, tzinfo=timezone.utc),
         model_names=["test_1", "test_2"],
-        properties_model="test_1",
     )
 
     assert len(forecast_values_read) == 7
@@ -202,8 +199,8 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
     assert forecast_values_read[1]._properties == {"10": 0.9, "90": 1.1}
     assert forecast_values_read[2]._properties == {"10": 0.9, "90": 1.1}
     assert forecast_values_read[3]._properties == {"10": 0.9, "90": 1.1}
-    assert forecast_values_read[4]._properties == {"10": 1.9, "90": 2.1}
-    assert forecast_values_read[5]._properties == {"10": 2.9, "90": 3.1}
+    assert forecast_values_read[4]._properties == {"10": 1.8, "90": 2.2}
+    assert forecast_values_read[5]._properties == {"10": 2.7, "90": 3.3}
 
     assert forecast_values_read[0]._adjust_mw == 0
     assert forecast_values_read[1]._adjust_mw == 0
@@ -259,7 +256,6 @@ def test_get_blend_forecast_values_two_models_plevel_second(db_session):
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2022, 12, 31, 0, 0, tzinfo=timezone.utc),
         model_names=["test_2", "test_1"],
-        properties_model="test_1",
     )
 
     assert len(forecast_values_read) == 7
@@ -276,9 +272,9 @@ def test_get_blend_forecast_values_two_models_plevel_second(db_session):
 
     assert forecast_values_read[0]._properties == {"10": 0.9, "90": 1.1}
     assert forecast_values_read[1]._properties == {"10": 0.9, "90": 1.1}
-    assert forecast_values_read[2]._properties == {"10": 1.9, "90": 2.1}
-    assert forecast_values_read[3]._properties == {"10": 1.9, "90": 2.1}
-    assert forecast_values_read[4]._properties == {"10": 1.4, "90": 1.6}
+    assert forecast_values_read[2]._properties == {"10": 1.8, "90": 2.2}
+    assert forecast_values_read[3]._properties == {"10": 1.8, "90": 2.2}
+    assert forecast_values_read[4]._properties == {"10": 1.35, "90": 1.65}
     assert forecast_values_read[5]._properties == {"10": 0.9, "90": 1.1}
 
     assert forecast_values_read[0]._adjust_mw == 0
@@ -315,6 +311,7 @@ def test_get_blend_forecast_values_latest_negative(db_session):
                 target_time=datetime(2023, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=t),
                 model_id=model.id,
                 adjust_mw=adjust,
+                properties={"10": 0.9, "90": 1.1},
             )
             for t in forecast_horizon_minutes
         ]
@@ -327,7 +324,6 @@ def test_get_blend_forecast_values_latest_negative(db_session):
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         model_names=["test_1", "test_2"],
-        properties_model="test_1",
     )
 
     assert len(forecast_values_read) == 4

@@ -17,7 +17,7 @@ but we only update the ForecastValue table every 30 minutes
 
 - Note we only blend forecasts if they are made within 2 hours. 
 If all forecasts are older than this, then all forecasts are used.
-- Currently the probablistics forecasts come from national_xg model. 
+- The probabilistic forecasts are now blended using the same method as the expected value
 
 # Tests
 

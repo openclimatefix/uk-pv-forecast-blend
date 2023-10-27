@@ -59,9 +59,11 @@ def app(gsps: List[int] = None):
     with connection.get_session() as session:
 
         model = get_blend_model(session)
-        # This is not quite right as the model could have been made with a earlier version,
-        # but I think its the best we can do
+
+        # Get the latest input data
         input_data_last_updated = get_latest_input_data_last_updated(session=session)
+        # This is not quite right as the forecast could have been made with an earlier version,
+        # but I think its the best we can do right now
 
         forecasts = []
         for gsp_id in gsps:

@@ -8,6 +8,7 @@ For each GSP
 """
 
 import os
+import json
 from datetime import datetime, timedelta, timezone
 from typing import List
 
@@ -57,10 +58,12 @@ def app(gsps: List[int] = None):
 
     with connection.get_session() as session:
 
-        model = get_model(name="blend", version=__version__, session=session)
-        # This is not quite right as the model could have been made with a earlier version,
-        # but I think its the best we can do
+        model = get_blend_model(session)
+
+        # Get the latest input data
         input_data_last_updated = get_latest_input_data_last_updated(session=session)
+        # This is not quite right as the forecast could have been made with an earlier version,
+        # but I think its the best we can do right now
 
         forecasts = []
         for gsp_id in gsps:
@@ -107,6 +110,27 @@ def app(gsps: List[int] = None):
                 update_national=True,
                 update_gsp=True,
             )
+
+
+def get_blend_model(session):
+    """Get the blend model
+
+    The version is made up of all the models version for example
+    version = {"cnn": "0.0.1", "National_xg": "0.0.1", "pvnet_v2": "0.0.1", "blend": "0.0.1"}
+    """
+    # get all model versions
+    models = {}
+    for model_name in ["cnn", "National_xg", "pvnet_v2"]:
+        model = get_model(name=model_name, session=session)
+        models[model_name] = model.version
+
+    # add blend version
+    models['blend'] = __version__
+    all_version = json.dumps(models)
+
+    # get model object from database
+    model = get_model(name="blend", version=all_version, session=session)
+    return model
 
 
 def make_forecast(

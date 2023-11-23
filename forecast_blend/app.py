@@ -30,6 +30,7 @@ from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from blend import get_blend_forecast_values_latest
+from forecast_blend.utils import get_start_datetime
 from weights import weights
 
 logger = structlog.stdlib.get_logger()
@@ -46,15 +47,7 @@ def app(gsps: List[int] = None):
     # make connection to database
     connection = DatabaseConnection(url=os.getenv("DB_URL", "not_set"), echo=False)
 
-    # get utc now minus 1 hour, for the start time of these blending
-    start_datetime = datetime.now(tz=timezone.utc) - timedelta(hours=1)
-    # round up to nearest 30 minutes
-    if start_datetime.minute < 30:
-        start_datetime = start_datetime.replace(minute=30, second=0, microsecond=0)
-    else:
-        start_datetime = start_datetime.replace(
-            hour=start_datetime.hour + 1, minute=0, second=0, microsecond=0
-        )
+    start_datetime = get_start_datetime()
 
     with connection.get_session() as session:
 

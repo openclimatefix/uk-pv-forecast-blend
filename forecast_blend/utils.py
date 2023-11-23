@@ -313,3 +313,23 @@ def blend_together_one_target_time(
     forecast_values_one_target_time_blend.reset_index(inplace=True, drop=True)
 
     return forecast_values_one_target_time_blend
+
+
+def get_start_datetime():
+    """
+    Get the start datetime for the blending.
+
+    This is the utc now minus 1 hour, rounded up to the nearest 30 minutes
+    """
+    # get utc now minus 1 hour, for the start time of these blending
+    start_datetime = datetime.now(tz=timezone.utc) - timedelta(hours=1)
+
+    # round up to nearest 30 minutes
+    old_minutes = start_datetime.minute
+    start_datetime = start_datetime.replace(minute=00, second=0, microsecond=0)
+    if old_minutes < 30:
+        start_datetime = start_datetime + timedelta(minutes=30)
+    else:
+        start_datetime = start_datetime + timedelta(hours=1)
+
+    return start_datetime

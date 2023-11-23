@@ -49,12 +49,13 @@ def app(gsps: List[int] = None):
     # get utc now minus 1 hour, for the start time of these blending
     start_datetime = datetime.now(tz=timezone.utc) - timedelta(hours=1)
     # round up to nearest 30 minutes
-    if start_datetime.minute < 30:
-        start_datetime = start_datetime.replace(minute=30, second=0, microsecond=0)
+
+    old_minutes = start_datetime.minute
+    start_datetime = start_datetime.replace(minute=00, second=0, microsecond=0)
+    if old_minutes < 30:
+        start_datetime = start_datetime + timedelta(minutes=30)
     else:
-        start_datetime = start_datetime.replace(
-            hour=start_datetime.hour + 1, minute=0, second=0, microsecond=0
-        )
+        start_datetime = start_datetime + timedelta(hours=1)
 
     with connection.get_session() as session:
 

@@ -1,4 +1,4 @@
-from forecast_blend.utils import get_start_datetime
+from utils import get_start_datetime
 from freezegun import freeze_time
 from datetime import datetime, timezone
 

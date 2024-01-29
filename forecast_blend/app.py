@@ -61,27 +61,31 @@ def app(gsps: List[int] = None):
         forecasts = []
         for gsp_id in gsps:
             logger.info(f"Blending forecasts for gsp id {gsp_id}")
+            try:
 
-            location = get_location(session=session, gsp_id=gsp_id)
+                location = get_location(session=session, gsp_id=gsp_id)
 
-            # 1. and 2. load and blend forecast values together
-            forecast_values = get_blend_forecast_values_latest(
-                session=session,
-                gsp_id=gsp_id,
-                start_datetime=start_datetime,
-                weights=weights,
-                model_names=["cnn", "National_xg", "pvnet_v2"],
-            )
+                # 1. and 2. load and blend forecast values together
+                forecast_values = get_blend_forecast_values_latest(
+                    session=session,
+                    gsp_id=gsp_id,
+                    start_datetime=start_datetime,
+                    weights=weights,
+                    model_names=["cnn", "National_xg", "pvnet_v2"],
+                )
 
-            # make Forecast SQL
-            assert len(forecast_values) > 0, "No forecast values made"
-            forecast = make_forecast(
-                forecast_values=forecast_values,
-                location=location,
-                model=model,
-                input_data_last_updated=input_data_last_updated,
-            )
-            forecasts.append(forecast)
+                # make Forecast SQL
+                assert len(forecast_values) > 0, "No forecast values made"
+                forecast = make_forecast(
+                    forecast_values=forecast_values,
+                    location=location,
+                    model=model,
+                    input_data_last_updated=input_data_last_updated,
+                )
+                forecasts.append(forecast)
+            except Exception as e:
+                logger.exception(f"Failed to blend forecasts for gsp_id {gsp_id}")
+                logger.debug(f"Exception: {e}")
 
         # 3. save to database
         # save to forecast_value_latest table, and not to the

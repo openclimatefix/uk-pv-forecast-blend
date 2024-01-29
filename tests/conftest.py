@@ -33,6 +33,28 @@ def forecasts(db_session):
 
     return None
 
+@pytest.fixture
+def forecast_national(db_session):
+    t0_datetime_utc = datetime.utcnow() + timedelta(days=2)
+    # time detal of 2 days is used as fake forecast are made 2 days in the past,
+    # this makes them for now
+    # create
+    for model_name in ["cnn", "pvnet_v2", "National_xg"]:
+
+        gsp_ids = [0]
+
+        f = make_fake_forecasts(
+            gsp_ids=gsp_ids,
+            session=db_session,
+            model_name=model_name,
+            n_fake_forecasts=16,
+            t0_datetime_utc=t0_datetime_utc,  # add
+        )  # add
+
+        save(forecasts=f, session=db_session, apply_adjuster=False)
+
+    return None
+
 
 """
 This is a bit complicated and sensitive to change

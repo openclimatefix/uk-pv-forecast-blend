@@ -76,3 +76,27 @@ def test_app_twice(db_session, forecasts):
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (23 + 11) * 16
     assert len(db_session.query(ForecastSQL).all()) == 46 + 11 * 2  # historic and not
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 34 * 16
+
+
+def test_app_only_national(db_session, forecast_national):
+
+    # Check the number forecasts have been made
+    # 1 National)
+    # This is for PVnet and CNN, but National_xg only is national
+    # 3
+    # Doubled for historic and forecast
+    assert len(db_session.query(ForecastSQL).all()) == 6
+    assert len(db_session.query(LocationSQL).all()) == 1
+    #  16 time steps in forecast
+    assert len(db_session.query(ForecastValueSQL).all()) == 3 * 16
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == 3 * 16
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 3 * 16
+
+    app(gsps=list(range(0, 2)))
+
+    assert len(db_session.query(ForecastValueSQL).all()) == 4 * 16
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 4 * 16
+    assert len(db_session.query(ForecastSQL).all()) == 8   # historic and not
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == 4 * 16
+
+

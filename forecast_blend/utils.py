@@ -14,17 +14,17 @@ def check_forecast_created_utc(forecast_values_all_model) -> List[Union[str, Lis
     """
     Check if forecasts are valid.
 
-    We only consider forecast less than 2 hours old.
-    If all forecast are older than 2 hours, we used both.
+    We only consider forecast less than 6 hours old.
+    If all forecast are older than 6 hours, we used both.
 
     :param forecast_values_all_model: list of forecast
     :return: list of valid forecasts
     """
     one_forecast_created_within_timedelta = True
 
-    # if all forecasts are later than 2 hours, then we use the blend,
-    # otherwise we only use forecast less than 2 hours
-    # remove all forecasts that are older than 2 hours
+    # if all forecasts are later than 6 hours, then we use the blend,
+    # otherwise we only use forecast less than 6 hours
+    # remove all forecasts that are older than 6 hours
     forecast_values_all_model_valid = []
     for model_name, forecast_values_one_model in forecast_values_all_model:
 
@@ -32,7 +32,7 @@ def check_forecast_created_utc(forecast_values_all_model) -> List[Union[str, Lis
 
         one_forecast_created_within_timedelta = one_forecast_created > datetime.now(
             timezone.utc
-        ) - timedelta(hours=2)
+        ) - timedelta(hours=6)
 
         if one_forecast_created_within_timedelta:
             logger.debug(

@@ -15,7 +15,7 @@ but we only update the ForecastValue table every 30 minutes
 
 # Details
 
-- Note we only blend forecasts if they are made within 2 hours. 
+- Note we only blend forecasts if they are made within 6 hours. 
 If all forecasts are older than this, then all forecasts are used.
 - The probabilistic forecasts are now blended using the same method as the expected value
 

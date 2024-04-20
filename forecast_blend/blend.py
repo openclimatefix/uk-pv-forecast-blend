@@ -112,6 +112,12 @@ def get_blend_forecast_values_latest(
     # convert back to list of forecast values
     forecast_values = convert_df_to_list_forecast_values(forecast_values_blended)
 
+    # Update model_info for each ForecastValue
+    for forecast_value, weight_dict in zip(forecast_values, weights_df.to_dict('records')):
+        forecast_value._model_info = {
+            model: weight for model, weight in weight_dict.items() if model in model_names
+        }
+
     return forecast_values
 
 

@@ -172,7 +172,7 @@ def add_p_levels_to_forecast_values(
     # format plevels back to dict
     blended_df.rename(columns={'plevel_10': '10', 'plevel_90': '90'}, inplace=True)
     blended_df["properties"] = blended_df[["10", "90"]].apply(
-        lambda x: json.loads(x.to_json()) if pd.notnull(x).all() else {}, axis=1
+        lambda x: json.loads(x.to_json()), axis=1
     )
 
     # drop columns '10' and '90

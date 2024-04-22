@@ -197,10 +197,10 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
 
     assert forecast_values_read[0]._properties == {"10": 0.9, "90": 1.1} or forecast_values_read[0]._properties == {}
     assert forecast_values_read[1]._properties == {"10": 0.9, "90": 1.1} or forecast_values_read[1]._properties == {}
-    assert forecast_values_read[2]._properties == {"10": 1.8, "90": 2.2} or forecast_values_read[2]._properties == {}
-    assert forecast_values_read[3]._properties == {"10": 1.8, "90": 2.2} or forecast_values_read[3]._properties == {}
-    assert forecast_values_read[4]._properties == {"10": 2.7, "90": 3.3} or forecast_values_read[4]._properties == {}
-    assert forecast_values_read[5]._properties == {"10": 0.9, "90": 1.1} or forecast_values_read[5]._properties == {}
+    assert forecast_values_read[2]._properties == {"10": 0.9, "90": 1.1} or forecast_values_read[2]._properties == {}
+    assert forecast_values_read[3]._properties == {"10": 0.9, "90": 1.1} or forecast_values_read[3]._properties == {}
+    assert forecast_values_read[4]._properties == {"10": 1.8, "90": 2.2} or forecast_values_read[4]._properties == {}
+    assert forecast_values_read[5]._properties == {"10": 2.7, "90": 3.3} or forecast_values_read[5]._properties == {}
 
     assert forecast_values_read[0]._adjust_mw == 0
     assert forecast_values_read[1]._adjust_mw == 0

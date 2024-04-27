@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from nowcasting_datamodel.connection import DatabaseConnection
@@ -10,7 +10,7 @@ from testcontainers.postgres import PostgresContainer
 
 @pytest.fixture
 def forecasts(db_session):
-    t0_datetime_utc = datetime.utcnow() + timedelta(days=2)
+    t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
@@ -35,7 +35,7 @@ def forecasts(db_session):
 
 @pytest.fixture
 def forecast_national(db_session):
-    t0_datetime_utc = datetime.utcnow() + timedelta(days=2)
+    t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create

@@ -8,7 +8,7 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueLatestSQL,
     ForecastValueSevenDaysSQL,
 )
-from nowcasting_datamodel.read.read import get_model
+from nowcasting_datamodel.read.read_models import get_model
 
 logger = logging.getLogger(__name__)
 

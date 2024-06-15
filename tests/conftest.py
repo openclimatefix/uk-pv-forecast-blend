@@ -5,6 +5,8 @@ import pytest
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts
 from nowcasting_datamodel.save.save import save
+
+from forecast_blend.weights import model_names
 from testcontainers.postgres import PostgresContainer
 
 
@@ -14,7 +16,7 @@ def forecasts(db_session):
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
-    for model_name in ["cnn", "pvnet_v2", "National_xg"]:
+    for model_name in model_names:
 
         if model_name == "National_xg":
             gsp_ids = [0]
@@ -39,7 +41,7 @@ def forecast_national(db_session):
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
-    for model_name in ["cnn", "pvnet_v2", "National_xg"]:
+    for model_name in model_names:
 
         gsp_ids = [0]
 

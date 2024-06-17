@@ -24,8 +24,8 @@ from nowcasting_datamodel.models import (
 from nowcasting_datamodel.read.read import (
     get_latest_input_data_last_updated,
     get_location,
-    get_model,
 )
+from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
@@ -35,7 +35,7 @@ from weights import weights, model_names
 
 logger = structlog.stdlib.get_logger()
 
-__version__ = "0.0.28"
+__version__ = "0.0.29"
 
 
 def app(gsps: List[int] = None):

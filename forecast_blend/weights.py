@@ -41,7 +41,7 @@ weights = [
         # pvnet_v2 to pvnet_day_ahead
         "start_horizon_hour": 7,
         "end_horizon_hour": 8,
-        "start_weight": [0, 0, 1],
+        "start_weight": [1, 0, 0],
         "end_weight": [0, 1, 0],
     },
     {

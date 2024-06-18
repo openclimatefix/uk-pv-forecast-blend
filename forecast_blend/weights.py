@@ -8,6 +8,8 @@ import structlog
 
 logger = structlog.stdlib.get_logger()
 
+model_names = ["pvnet_v2", "pvnet_day_ahead", "National_xg"]
+
 default_weights = [
     {
         "end_horizon_hour": 2,
@@ -27,24 +29,23 @@ default_weights = [
 
 
 # merged from
-# - cnn
 # - pvnet_v2
-# - National_xg
+# - pvnet_day_ahead
 weights = [
     {
         # pvnet_v2
         "end_horizon_hour": 7,
-        "end_weight": [0, 0, 1],
+        "end_weight": [1, 0, 0],
     },
     {
-        # pvnet_v2 to National_xg
+        # pvnet_v2 to pvnet_day_ahead
         "start_horizon_hour": 7,
         "end_horizon_hour": 8,
-        "start_weight": [0, 0, 1],
+        "start_weight": [1, 0, 0],
         "end_weight": [0, 1, 0],
     },
     {
-        # National_xg
+        # pvnet_day_ahead
         "start_horizon_hour": 8,
         "end_horizon_hour": 36,
         "start_weight": [0, 1, 0],

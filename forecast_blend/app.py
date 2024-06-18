@@ -31,7 +31,7 @@ from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from blend import get_blend_forecast_values_latest
 from utils import get_start_datetime
-from weights import weights
+from weights import weights, model_names
 
 logger = structlog.stdlib.get_logger()
 
@@ -71,7 +71,7 @@ def app(gsps: List[int] = None):
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,
                     weights=weights,
-                    model_names=["cnn", "National_xg", "pvnet_v2"],
+                    model_names=model_names,
                 )
 
                 # make Forecast SQL
@@ -117,7 +117,7 @@ def get_blend_model(session):
     """
     # get all model versions
     models = {}
-    for model_name in ["cnn", "National_xg", "pvnet_v2"]:
+    for model_name in model_names:
         model = get_model(name=model_name, session=session)
         models[model_name] = model.version
 

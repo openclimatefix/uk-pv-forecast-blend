@@ -123,8 +123,11 @@ def convert_df_to_list_forecast_values(forecast_values_blended: pd.DataFrame):
         expected_power_generation_megawatts = round(expected_power_generation_megawatts, 2)
         adjust_mw = round(row.adjust_mw, 2)
 
+        # make datetime
+        target_time = pd.to_datetime(row.target_time)
+
         forecast_value = ForecastValue(
-            target_time=row.target_time,
+            target_time=target_time,
             expected_power_generation_megawatts=expected_power_generation_megawatts,
         )
         forecast_value._adjust_mw = adjust_mw

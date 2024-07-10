@@ -96,7 +96,12 @@ def app(gsps: List[int] = None):
         assert len(forecasts[0].forecast_values) > 0, "No forecast values sql made"
         if is_last_forecast_made_before_last_30_minutes_step(session=session):
             logger.debug(f"Saving {len(forecasts)} forecasts")
-            save(session=session, forecasts=forecasts, apply_adjuster=False)
+            save(
+                session=session,
+                forecasts=forecasts,
+                apply_adjuster=False,
+                remove_non_distinct_last_seven_days=True,
+            )
         else:
             logger.debug(
                 f"Saving {len(forecasts[0].forecast_values)} forecast values to latest table for blended model"
@@ -122,7 +127,7 @@ def get_blend_model(session):
         models[model_name] = model.version
 
     # add blend version
-    models['blend'] = __version__
+    models["blend"] = __version__
     all_version = json.dumps(models)
 
     # get model object from database

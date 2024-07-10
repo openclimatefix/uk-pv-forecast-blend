@@ -113,6 +113,8 @@ def app(gsps: List[int] = None):
                 update_gsp=True,
             )
 
+    logger.info("Finished")
+
 
 def get_blend_model(session):
     """Get the blend model

@@ -11,7 +11,7 @@ import os
 import json
 from datetime import datetime, timedelta, timezone
 from typing import List
-
+import sentry_sdk
 import structlog
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models import (
@@ -36,6 +36,15 @@ from weights import weights, model_names
 logger = structlog.stdlib.get_logger()
 
 __version__ = "1.0.1"
+
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    environment=os.getenv("ENVIRONMENT", "local"),
+    traces_sample_rate=1
+)
+
+sentry_sdk.set_tag("app_name", "uk_pv_forecast_blend")
+sentry_sdk.set_tag("version", nowcasting_datamodel.__version__)
 
 
 def app(gsps: List[int] = None):

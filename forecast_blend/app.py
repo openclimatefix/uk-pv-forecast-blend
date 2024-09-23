@@ -37,6 +37,7 @@ logger = structlog.stdlib.get_logger()
 
 __version__ = "1.0.1"
 
+#sentry
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
     environment=os.getenv("ENVIRONMENT", "local"),

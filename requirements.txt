@@ -4,3 +4,4 @@ pandas
 freezegun
 pytest
 testcontainers
+sentry-sdk==2.13.0

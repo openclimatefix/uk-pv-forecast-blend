@@ -37,7 +37,6 @@ logger = structlog.stdlib.get_logger()
 
 __version__ = "1.0.1"
 
-#sentry
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
     environment=os.getenv("ENVIRONMENT", "local"),
@@ -45,7 +44,7 @@ sentry_sdk.init(
 )
 
 sentry_sdk.set_tag("app_name", "uk_pv_forecast_blend")
-sentry_sdk.set_tag("version", nowcasting_datamodel.__version__)
+sentry_sdk.set_tag("version", __version__)
 
 
 def app(gsps: List[int] = None):

@@ -8,7 +8,7 @@ import structlog
 
 logger = structlog.stdlib.get_logger()
 
-model_names = ["pvnet_v2", "pvnet_day_ahead", "pnvet_ecmwf", "National_xg"]
+model_names = ["pvnet_v2", "pvnet_day_ahead", "pvnet_ecmwf", "National_xg"]
 
 # merged from
 # - pvnet_v2
@@ -36,7 +36,7 @@ weights = [
     {
         # backup to use ecmwf
         "start_horizon_hour": 999,
-        "end_horizon_hour": 999,
+        "end_horizon_hour": 1000,
         "start_weight": [0, 0, 1, 0],
         "end_weight": [0, 0, 1, 0],
     },

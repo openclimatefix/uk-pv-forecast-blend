@@ -57,6 +57,33 @@ def forecast_national(db_session):
 
     return None
 
+@pytest.fixture
+def forecast_national_ecmwf_and_xg(db_session):
+    t0_datetime_utc = (datetime.now(tz=timezone.utc) + timedelta(days=2)).replace(minute=0, second=0, microsecond=0)
+    # time detal of 2 days is used as fake forecast are made 2 days in the past,
+    # this makes them for now
+    # create
+    model_names_ecmwf_and_xg = ["pvnet_ecmwf", "National_xg"]
+    for i in range(len(model_names_ecmwf_and_xg)):
+        model_name = model_names_ecmwf_and_xg[i]
+
+        gsp_ids = [0]
+
+        forecasts = make_fake_forecasts(
+            gsp_ids=gsp_ids,
+            session=db_session,
+            model_name=model_name,
+            n_fake_forecasts=16,
+            t0_datetime_utc=t0_datetime_utc,  # add
+        )  # add
+        for f in forecasts:
+            for fv in f.forecast_values:
+                fv.expected_power_generation_megawatts = i
+
+        save(forecasts=forecasts, session=db_session, apply_adjuster=False)
+
+    return None
+
 
 """
 This is a bit complicated and sensitive to change

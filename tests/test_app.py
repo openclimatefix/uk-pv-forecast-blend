@@ -8,6 +8,7 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSevenDaysSQL,
     ForecastValueSQL,
 )
+from nowcasting_datamodel.models.models import MLModelSQL
 
 logger = logging.getLogger(__name__)
 
@@ -101,5 +102,38 @@ def test_app_only_national(db_session, forecast_national):
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N+1) * 16
     assert len(db_session.query(ForecastSQL).all()) == 2*(N+1)   # historic and not
     assert len(db_session.query(ForecastValueLatestSQL).all()) == (N+1) * 16
+
+
+def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
+    # Check the number forecasts have been made
+    # This is for PVnet ecmwf and National_xg only is national
+    # 4
+    N = 2
+    # Doubled for historic and forecast
+    assert len(db_session.query(ForecastSQL).all()) == 2 * N
+    assert len(db_session.query(LocationSQL).all()) == 1
+    #  16 time steps in forecast
+    assert len(db_session.query(ForecastValueSQL).all()) == N * 16
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == N * 16
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * 16
+
+    app(gsps=list(range(0, 1)))
+
+    # get all the blended forecast values latest
+    models = db_session.query(MLModelSQL).where(MLModelSQL.name == 'blend').all()
+    assert len(models) == 1
+    fvs = db_session.query(ForecastValueLatestSQL).where(ForecastValueLatestSQL.model_id == models[0].id).all()
+
+    # make sure this is the ECMWF not xg, for xg, it would be 1
+    assert len(fvs) == 16
+    for fv in fvs:
+        assert fv.expected_power_generation_megawatts == 0, f'{fv.expected_power_generation_megawatts} {fv.target_time}'
+
+    assert len(db_session.query(ForecastValueSQL).all()) == (N + 1) * 16
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N + 1) * 16
+    assert len(db_session.query(ForecastSQL).all()) == 2 * (N + 1)  # historic and not
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == (N + 1) * 16
+
+
 
 

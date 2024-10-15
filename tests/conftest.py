@@ -64,8 +64,7 @@ def forecast_national_ecmwf_and_xg(db_session):
     # this makes them for now
     # create
     model_names_ecmwf_and_xg = ["pvnet_ecmwf", "National_xg"]
-    for i in range(len(model_names_ecmwf_and_xg)):
-        model_name = model_names_ecmwf_and_xg[i]
+    for i, model_name in enumerate(model_names_ecmwf_and_xg):
 
         gsp_ids = [0]
 

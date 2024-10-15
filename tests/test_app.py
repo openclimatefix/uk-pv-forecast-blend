@@ -31,8 +31,8 @@ def test_app(db_session, forecasts):
 
     # Check the number forecasts have been made
     # (10 GSPs + 1 National) = 11 forecasts
-    # This is for PVnet and CNN, but National_xg only is national
-    # 11 + 11 + 11+ 1 = 34
+    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
+    # 11 + 11 + 11 + 1 = 34
     N = 34
     # Doubled for historic and forecast
     assert len(db_session.query(ForecastSQL).all()) == N * 2
@@ -54,7 +54,7 @@ def test_app_twice(db_session, forecasts):
 
     # Check the number forecasts have been made
     # (10 GSPs + 1 National) = 11 forecasts
-    # This is for PVnet and CNN, but National_xg only is national
+    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
     # 11 + 11 + 11 +1 = 34
     N = 34
     # Doubled for historic and forecast
@@ -85,7 +85,7 @@ def test_app_only_national(db_session, forecast_national):
 
     # Check the number forecasts have been made
     # 1 National)
-    # This is for PVnet, PVnet ecmwf and CNN, but National_xg only is national
+    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
     # 4
     N = 4
     # Doubled for historic and forecast

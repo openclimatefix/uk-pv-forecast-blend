@@ -18,7 +18,7 @@ but we only update the ForecastValue table every 30 minutes
 - Note we only blend forecasts if they are made within 6 hours. 
 If all forecasts are older than this, then all forecasts are used.
 - The probabilistic forecasts are now blended using the same method as the expected value
-- We current intial take `Pvnet`, then blend it with `PVnet DA`. `PVnet ECMWF` is used as a back up, and final `National-xg` is a final backup. 
+- We current take `Pvnet`, then blend it with `PVnet DA`. `PVnet ECMWF` is used as a backup, and final `National-xg` is a final backup. 
 
 ```mermaid
   graph TD;

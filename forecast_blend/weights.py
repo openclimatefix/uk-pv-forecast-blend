@@ -35,8 +35,8 @@ weights = [
     },
     {
         # backup to use ecmwf
-        # this works becasue if pvnet or pvnet da is not there,
-        # then the blend is made on any future weight settings. 
+        # this works because if pvnet or pvnet da is not there,
+        # then the blend is made on any future weight settings.
         "start_horizon_hour": 999,
         "end_horizon_hour": 1000,
         "start_weight": [0, 0, 1, 0],

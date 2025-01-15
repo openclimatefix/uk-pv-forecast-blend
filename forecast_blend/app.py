@@ -190,10 +190,13 @@ def is_last_forecast_made_before_last_30_minutes_step(session):
     Forecast, ForecastValues and ForecastValluesLastSevenDays
     """
 
+    one_week_ago = datetime.now(tz=timezone.utc) - timedelta(days=7)
+
     query = session.query(ForecastSQL)
     query = query.join(MLModelSQL)
     query = query.filter(MLModelSQL.name == "blend")
     query = query.filter(ForecastSQL.historic == False)
+    query = query.filter(ForecastSQL.created_utc > one_week_ago)
     query = query.order_by(ForecastSQL.forecast_creation_time.desc())
     last_forecast = query.limit(1).all()
 

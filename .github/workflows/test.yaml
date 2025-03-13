@@ -8,7 +8,7 @@ on:
     - cron: "0 12 * * 1"
 jobs:
   call-run-python-tests:
-    uses: openclimatefix/.github/.github/workflows/python-test.yml@main
+    uses: openclimatefix/.github/.github/workflows/python-test.yml@e67a64b086a5662c39f6b4523a97dd0641904279
     with:
       # pytest-cov looks at this folder
       pytest_cov_dir: "forecast_blend"

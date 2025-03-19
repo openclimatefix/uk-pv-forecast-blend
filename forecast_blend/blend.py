@@ -110,6 +110,13 @@ def get_blend_forecast_values_latest(
         forecast_values_all_model
     )
 
+    # This is a hard code fix, and soon we plane to improve blending, by using dynamic weights from the
+    # MAE results from the ML experiments
+    # if pvnet_v2 is not in model names, then change the weights for pvnet_v2 to pvnet_ecmwf
+    if "pvnet_v2" not in [model_name for model_name, _ in forecast_values_all_model_valid]:
+        if "pvnet_v2" in weights_df.columns:
+            weights_df.rename(columns={"pvnet_v2": "pvnet_ecmwf"}, inplace=True)
+
     # make into dataframe
     forecast_values_all_model = convert_list_forecast_values_to_df(
         forecast_values_all_model_valid

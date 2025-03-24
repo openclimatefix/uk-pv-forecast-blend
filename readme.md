@@ -50,6 +50,11 @@ If all forecasts are older than this, then all forecasts are used.
     end
 ```
 
+## Environment Variables
+
+- `DB_URL`: The database url you want to save the results to
+- `N_GSPS`: The number of gsps you want to pull. N_GSPS=1 means only National is run. 
+
 # Tests
 
 Tests are in the tests folder and can be run using pytest

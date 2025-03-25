@@ -53,7 +53,7 @@ If all forecasts are older than this, then all forecasts are used.
 ## Environment Variables
 
 - `DB_URL`: The database url you want to save the results to
-- `N_GSPS`: The number of gsps you want to pull. N_GSPS=1 means only National is run. 
+- `N_GSP`: The number of gsps you want to pull. N_GSP=1 means only National is run. 
 
 # Tests
 

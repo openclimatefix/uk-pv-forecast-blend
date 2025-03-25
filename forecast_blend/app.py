@@ -35,7 +35,7 @@ from weights import weights, model_names
 
 logger = structlog.stdlib.get_logger()
 
-__version__ = "1.0.8"
+__version__ = "1.0.9"
 
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),

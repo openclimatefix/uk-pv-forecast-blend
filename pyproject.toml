@@ -1,0 +1,57 @@
+# --- PROJECT CONFIGURATION --- #
+
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forecast_blend"
+dynamic = ["version"]  # Automatically manage versioning
+description = "This app blends forecasts together using weights and saves them for API use."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT License"}
+authors = [
+    { name = "Rishi Prasad", email = "rishiprasad002@gmail.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "nowcasting_datamodel==1.5.56",
+    "numpy",
+    "pandas",
+    "freezegun",
+    "pytest",
+    "testcontainers",
+    "sentry-sdk==2.13.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "mypy",
+    "pytest",
+]
+
+[project.urls]
+repository = "https://github.com/openclimatefix/uk-pv-forecast-blend"
+
+[tool.setuptools]
+packages = ["forecast_blend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+
+[tool.black]
+line-length = 88
+
+[tool.flake8]
+max-line-length = 88
+

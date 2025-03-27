@@ -5,3 +5,9 @@ freezegun
 pytest
 testcontainers
 sentry-sdk==2.13.0
+
+[dev]
+black
+flake8
+mypy
+pytest

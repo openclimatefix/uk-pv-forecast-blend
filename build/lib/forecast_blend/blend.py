@@ -22,14 +22,13 @@ from nowcasting_datamodel.read.read import (
 )
 from sqlalchemy.orm.session import Session
 
-from forecast_blend.utils import (
+from utils import (
     blend_forecasts_together,
     check_forecast_created_utc,
     convert_df_to_list_forecast_values,
     convert_list_forecast_values_to_df,
 )
-
-from forecast_blend.weights import make_weights_df
+from weights import make_weights_df
 
 logger = structlog.stdlib.get_logger()
 

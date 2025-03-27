@@ -1,6 +1,6 @@
 import logging
 
-from app import app, is_last_forecast_made_before_last_30_minutes_step
+from forecast_blend.app import app, is_last_forecast_made_before_last_30_minutes_step
 from nowcasting_datamodel.models import LocationSQL
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,

@@ -29,10 +29,9 @@ from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
-from forecast_blend.blend import get_blend_forecast_values_latest
-from forecast_blend.utils import get_start_datetime
-from forecast_blend.weights import weights, model_names
-
+from blend import get_blend_forecast_values_latest
+from utils import get_start_datetime
+from weights import weights, model_names
 
 logger = structlog.stdlib.get_logger()
 

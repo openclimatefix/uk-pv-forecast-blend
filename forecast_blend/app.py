@@ -96,8 +96,7 @@ def app(gsps: List[int] = None):
                     session=session,
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,
-                    weights=weights,
-                    model_names=model_names,
+                    weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
                 )
 
                 # make Forecast SQL

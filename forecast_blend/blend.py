@@ -1,8 +1,7 @@
 """ Blends forecasts together
 
-1. creates weights for blending
-2. get forecast values for each model
-3. blends them together
+1. get forecast values for each model
+2. blends them together
 
 """
 
@@ -28,7 +27,6 @@ from utils import (
     convert_df_to_list_forecast_values,
     convert_list_forecast_values_to_df,
 )
-from weights import make_weights_df
 
 logger = structlog.stdlib.get_logger()
 
@@ -36,9 +34,8 @@ logger = structlog.stdlib.get_logger()
 def get_blend_forecast_values_latest(
     session: Session,
     gsp_id: int,
+    weights_df: pd.DataFrame,
     start_datetime: Optional[datetime] = None,
-    model_names: Optional[List[str]] = None,
-    weights: Optional[List[float]] = None,
     forecast_horizon_minutes: Optional[int] = None,
 ) -> List[ForecastValue]:
     """
@@ -46,10 +43,10 @@ def get_blend_forecast_values_latest(
 
     :param session: database session
     :param gsp_id: gsp id, to filter query on
+    :param weights_df: dataframe of weights to use for blending,
+        see structure in weights.py - get_national_blend_weights
     :param start_datetime: optional to filterer target_time by start_datetime
         If None is given then all are returned.
-    :param model_names: list of model names to use for blending
-    :param weights: list of weights to use for blending, see structure in make_weights_df
     :param forecast_horizon_minutes: The forecast horizon to blend together
 
     return: List of forecasts values blended from different models
@@ -59,17 +56,7 @@ def get_blend_forecast_values_latest(
         f"Getting blend forecast for gsp_id {gsp_id} and start_datetime {start_datetime}"
     )
 
-    if model_names is None:
-        model_names = ["cnn", "National_xg"]
-    if len(model_names) > 1:
-        weights_df = make_weights_df(
-            model_names,
-            weights,
-            start_datetime,
-            forecast_horizon_minutes=forecast_horizon_minutes,
-        )
-    else:
-        weights_df = None
+    model_names = weights_df.columns
 
     # get forecast for the different models
     forecast_values_all_model = []

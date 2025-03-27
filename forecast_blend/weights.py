@@ -5,9 +5,8 @@ import pandas as pd
 from typing import Callable
 from datetime import timezone
 
-
+from importlib.resources import files
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 import structlog
 
@@ -29,7 +28,8 @@ def get_horizon_maes() -> pd.DataFrame:
         A pandas DataFrame with pd.Timedelta horizons as the index and MAEs per model
         in the columns.
     """
-    df_maes = pd.read_csv("blend_horizon_mae_curves.csv", index_col=0).reset_index(names="horizon")
+    filepath = files('forecast_blend') / 'data' / 'model_horizon_mae_scores.csv'
+    df_maes = pd.read_csv(filepath, index_col=0).reset_index(names="horizon")
     df_maes["horizon"] = pd.to_timedelta(df_maes["horizon"]).to_numpy()
     return df_maes.set_index("horizon")
 
@@ -402,8 +402,7 @@ def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     df_all_weights = pd.concat([df_da_model_weights, df_intraday_model_weights], axis=1)
     
     # Filter out any models which are not used in this blend
-    df_all_weights = df_all_weights.loc[:, (df_all_weights > 0).any(axis=0)]
-    # TODO could use sum
+    df_all_weights = df_all_weights.loc[:, df_all_weights.sum(axis=0) > 0]
 
     # Shift the index to be relative to the forecast initialisation time
     df_all_weights.index = df_all_weights.index + t0
@@ -471,7 +470,7 @@ def get_regional_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     )
         
     # Filter out any models which are not used in this blend
-    weights_df = weights_df.loc[:, (weights_df > 0).any(axis=0)]
+    weights_df = weights_df.loc[:, weights_df.sum(axis=0) > 0]
 
     # Shift the index to be relative to the forecast initialisation time
     weights_df.index = weights_df.index + t0

@@ -8,11 +8,14 @@ from nowcasting_datamodel.save.save import save
 
 from forecast_blend.weights import model_names
 from testcontainers.postgres import PostgresContainer
+from freezegun import freeze_time
+
 
 
 @pytest.fixture
+@freeze_time("2023-01-01 00:00:01")
 def forecasts(db_session):
-    t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
+    t0_datetime_utc = datetime.now(tz=timezone.utc)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
@@ -36,8 +39,9 @@ def forecasts(db_session):
     return None
 
 @pytest.fixture
+@freeze_time("2023-01-01 00:00:00")
 def forecast_national(db_session):
-    t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
+    t0_datetime_utc = datetime.now(tz=timezone.utc)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
@@ -58,8 +62,9 @@ def forecast_national(db_session):
     return None
 
 @pytest.fixture
+@freeze_time("2023-01-01 00:00:00")
 def forecast_national_ecmwf_and_xg(db_session):
-    t0_datetime_utc = (datetime.now(tz=timezone.utc) + timedelta(days=2)).replace(minute=0, second=0, microsecond=0)
+    t0_datetime_utc = datetime.now(tz=timezone.utc)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create

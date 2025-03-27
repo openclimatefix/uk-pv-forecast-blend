@@ -31,7 +31,13 @@ from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from blend import get_blend_forecast_values_latest
 from utils import get_start_datetime
-from weights import weights, model_names
+from weights import (
+    model_names,
+    backfill_weights, 
+    get_national_blend_weights, 
+    get_regional_blend_weights,
+)
+import pandas as pd
 
 logger = structlog.stdlib.get_logger()
 
@@ -60,10 +66,18 @@ def app(gsps: List[int] = None):
     connection = DatabaseConnection(url=os.getenv("DB_URL", "not_set"), echo=False)
 
     start_datetime = get_start_datetime()
+    t0 = pd.Timestamp.utcnow().floor("30min")
+
 
     with connection.get_session() as session:
 
         model = get_blend_model(session)
+
+        national_weights_df = get_national_blend_weights(session, t0)
+        regional_weights_df = get_regional_blend_weights(session, t0)
+
+        national_weights_df = backfill_weights(national_weights_df, start_datetime)
+        regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
 
         # Get the latest input data
         input_data_last_updated = get_latest_input_data_last_updated(session=session)

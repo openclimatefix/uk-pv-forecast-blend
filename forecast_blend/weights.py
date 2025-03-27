@@ -69,34 +69,23 @@ def get_most_recent_forecast_ids(
         ForecastSQL.location_id,
         MLModelSQL.name,
     ]
-
-    # Create window function that assigns a row number per (location, model) group,
-    # ordered by descending forecast_creation_time (most recent forecast is row_number 1).
-    row_number_column = func.row_number().over(
-        partition_by=(ForecastSQL.location_id, MLModelSQL.name), 
-        order_by=ForecastSQL.forecast_creation_time.desc()
-    ).label("row_number")
     
     # Build subquery that joins the ForecastSQL and MLModelSQL tables,
     # applies filters, and calculates the row_number
-    ranked_forecasts = (
-        session.query(*forecast_columns, row_number_column)
+    query = (
+        session.query(*forecast_columns)
+        .distinct(ForecastSQL.location_id, MLModelSQL.name)
         .join(MLModelSQL, ForecastSQL.model_id == MLModelSQL.id)
         .filter(ForecastSQL.created_utc >= earliest_creation_time)
         .filter(MLModelSQL.name.in_(model_names))
-        .subquery("ranked_forecasts")
+        .order_by(ForecastSQL.location_id, MLModelSQL.name, ForecastSQL.forecast_creation_time.desc())
     )
 
-    # Select the the most recent forecasts per location and model
-    query = session.query(
-        ranked_forecasts.c.created_utc,
-        ranked_forecasts.c.id,
-        ranked_forecasts.c.forecast_creation_time,
-        ranked_forecasts.c.location_id,
-        ranked_forecasts.c.name,
-    ).filter(ranked_forecasts.c.row_number == 1)
-
     return pd.read_sql(query.statement, query.session.bind)
+
+
+def _get_most_recent_row(df):
+    return df.sort_values("forecast_creation_time", ascending=False).iloc[0]
 
 
 def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[str, pd.Timedelta]:
@@ -109,16 +98,14 @@ def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[st
     
     """
     
-    def get_most_recent_row(df):
-        return df.sort_values("forecast_creation_time", ascending=False).iloc[0]
-    
     # Filter to the most recent forecast ID per model
     df_forecast_ids = (
         df_forecast_ids.groupby("name")[df_forecast_ids.columns]
-        .apply(get_most_recent_row)
+        .apply(_get_most_recent_row)
     )
     
     # TODO: Use the saved forecast initialisation time when available
+    # https://github.com/openclimatefix/nowcasting_datamodel/issues/315
     # Approximate the forecast initialisation time
     df_forecast_ids["initialisation_datetime_utc"] = pd.to_datetime(
         df_forecast_ids["forecast_creation_time"].values
@@ -416,6 +403,7 @@ def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     
     # Filter out any models which are not used in this blend
     df_all_weights = df_all_weights.loc[:, (df_all_weights > 0).any(axis=0)]
+    # TODO could use sum
 
     # Shift the index to be relative to the forecast initialisation time
     df_all_weights.index = df_all_weights.index + t0

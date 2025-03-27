@@ -69,6 +69,7 @@ def get_blend_forecast_values_latest(
                 model_name=model_name,
             )
         else:
+            # TODO remove forecast_horizon_minutes
             forecast_values_one_model = get_forecast_values(
                 session=session,
                 gsp_ids=[gsp_id],

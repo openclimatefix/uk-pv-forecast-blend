@@ -435,7 +435,7 @@ def get_regional_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
           at that horizon). Models excluded due to excessive delay or missing
           MAE data will not appear as columns or will have zero/NaN weights.
     """
-    
+
     df_mae = get_horizon_maes().drop(columns="National_xg")
 
     # We need to have MAE-horizon values for all potential models
@@ -491,8 +491,7 @@ def backfill_weights(df: pd.DataFrame, start_datetime: pd.Timestamp) -> pd.DataF
     """
     
     fill_times = pd.date_range(start_datetime, df.index.min() - pd.Timedelta("30min"), freq="30min")
-    
-    
+
     df_filled = df.reindex(fill_times, method="bfill")
     
     return pd.concat([df_filled, df])

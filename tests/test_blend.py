@@ -12,6 +12,9 @@ from nowcasting_datamodel.read.read_models import get_model
 
 logger = logging.getLogger(__name__)
 
+# TODO updating, change weights to dataframe,
+#  import them or mock them him
+
 weights_three_models = [
     {
         # cnn

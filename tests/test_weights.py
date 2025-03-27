@@ -4,6 +4,9 @@ from freezegun import freeze_time
 from weights import make_weights_df
 
 
+# TODO strip out these tests
+# add tests for new weights funtcions
+
 @freeze_time("2023-01-02 00:00:01")
 def test_make_weights_df_yesterday():
     start_datetime = datetime(2023, 1, 1, 0, 0, 0, tzinfo=timezone.utc)

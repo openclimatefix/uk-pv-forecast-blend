@@ -12,7 +12,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT License"}
 authors = [
-    { name = "Rishi Prasad", email = "rishiprasad002@gmail.com" }
+    { name = "Open Climate Fix", email = "info@openclimatefix.org" }
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

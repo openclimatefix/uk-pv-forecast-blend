@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 
 from freezegun import freeze_time
-from weights import make_weights_df
+from forecast_blend.weights import make_weights_df
 
 
 @freeze_time("2023-01-02 00:00:01")

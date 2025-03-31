@@ -1,5 +1,7 @@
 import logging
 
+import pandas as pd
+
 from app import app, is_last_forecast_made_before_last_30_minutes_step
 from nowcasting_datamodel.models import LocationSQL
 from nowcasting_datamodel.models.forecast import (
@@ -9,15 +11,16 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 from nowcasting_datamodel.models.models import MLModelSQL
+import time_machine
 
 logger = logging.getLogger(__name__)
 
-
+@time_machine.travel("2023-01-01 00:00:01")
 def test_is_last_forecast_longer_30_minutes(db_session):
 
     assert is_last_forecast_made_before_last_30_minutes_step(db_session)
 
-
+@time_machine.travel("2023-01-01 00:00:01")
 def test_is_last_forecast_longer_30_minutes_dont_create(db_session, forecasts):
 
     # make sure model is "blend"
@@ -26,7 +29,7 @@ def test_is_last_forecast_longer_30_minutes_dont_create(db_session, forecasts):
 
     assert not is_last_forecast_made_before_last_30_minutes_step(db_session)
 
-
+@time_machine.travel("2023-01-01 00:00:01")
 def test_app(db_session, forecasts):
 
     # Check the number forecasts have been made
@@ -50,6 +53,7 @@ def test_app(db_session, forecasts):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == (N + 11) * 16
 
 
+@time_machine.travel("2023-01-01 00:00:01")
 def test_app_twice(db_session, forecasts):
 
     # Check the number forecasts have been made
@@ -81,6 +85,7 @@ def test_app_twice(db_session, forecasts):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == (N+11) * 16
 
 
+@time_machine.travel("2023-01-01 00:00:01")
 def test_app_only_national(db_session, forecast_national):
 
     # Check the number forecasts have been made
@@ -104,6 +109,7 @@ def test_app_only_national(db_session, forecast_national):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == (N+1) * 16
 
 
+@time_machine.travel("2023-01-01 00:00:01")
 def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
     # Check the number forecasts have been made
     # This is for PVnet ecmwf and National_xg only is national
@@ -112,27 +118,39 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
     # Doubled for historic and forecast
     assert len(db_session.query(ForecastSQL).all()) == 2 * N
     assert len(db_session.query(LocationSQL).all()) == 1
-    #  16 time steps in forecast
-    assert len(db_session.query(ForecastValueSQL).all()) == N * 16
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == N * 16
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * 16
 
-    app(gsps=list(range(0, 1)))
+    number_of_forecast_values = 120
+
+    #  16 time steps in forecast
+    assert len(db_session.query(ForecastValueSQL).all()) == N * number_of_forecast_values
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == N * number_of_forecast_values
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * number_of_forecast_values
+
+    app(gsps=[0])
 
     # get all the blended forecast values latest
     models = db_session.query(MLModelSQL).where(MLModelSQL.name == 'blend').all()
     assert len(models) == 1
     fvs = db_session.query(ForecastValueLatestSQL).where(ForecastValueLatestSQL.model_id == models[0].id).all()
 
-    # make sure this is the ECMWF not xg, for xg, it would be 1
-    assert len(fvs) == 16
-    for fv in fvs:
-        assert fv.expected_power_generation_megawatts == 0, f'{fv.expected_power_generation_megawatts} {fv.target_time}'
+    assert len(fvs) == 25
 
-    assert len(db_session.query(ForecastValueSQL).all()) == (N + 1) * 16
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N + 1) * 16
+    expected_values = pd.Series(
+        [0]*15+[0.25, 0.5, 0.75]+[1]*7,
+        index=pd.date_range(
+            "2022-12-31 23:30",
+            "2023-01-01 11:30",
+            freq="30min",
+        ),
+    )
+
+    for i, fv in enumerate(fvs):
+        assert fv.expected_power_generation_megawatts == expected_values.values[i], f'{fv.expected_power_generation_megawatts} {fv.target_time}'
+
+    assert len(db_session.query(ForecastValueSQL).all()) == (N * number_of_forecast_values) + 25
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N * number_of_forecast_values) + 25
     assert len(db_session.query(ForecastSQL).all()) == 2 * (N + 1)  # historic and not
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == (N + 1) * 16
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == (N * number_of_forecast_values) + 25
 
 
 

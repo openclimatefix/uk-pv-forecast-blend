@@ -140,9 +140,9 @@ def convert_df_to_list_forecast_values(forecast_values_blended: pd.DataFrame):
 
 
 def blend_forecasts_together(
-        forecast_values_all_model,
-        weights_df,
-        column_name_to_blend: str = "expected_power_generation_megawatts"
+    forecast_values_all_model,
+    weights_df,
+    column_name_to_blend: str = "expected_power_generation_megawatts"
 ):
     """
     Blend the forecasts together using the weights_df

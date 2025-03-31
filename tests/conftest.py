@@ -8,14 +8,14 @@ from nowcasting_datamodel.save.save import save
 
 from forecast_blend.weights import model_names
 from testcontainers.postgres import PostgresContainer
-from freezegun import freeze_time
+import time_machine
 
 
 
 @pytest.fixture
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def forecasts(db_session):
-    t0_datetime_utc = datetime.now(tz=timezone.utc)
+    t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
@@ -33,15 +33,16 @@ def forecasts(db_session):
             n_fake_forecasts=16,
             t0_datetime_utc=t0_datetime_utc,  # add
         )  # add
+        
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
     return None
 
 @pytest.fixture
-@freeze_time("2023-01-01 00:00:00")
+@time_machine.travel("2023-01-01 00:00:00")
 def forecast_national(db_session):
-    t0_datetime_utc = datetime.now(tz=timezone.utc)
+    t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
@@ -62,7 +63,7 @@ def forecast_national(db_session):
     return None
 
 @pytest.fixture
-@freeze_time("2023-01-01 00:00:00")
+@time_machine.travel("2023-01-01 00:00:00")
 def forecast_national_ecmwf_and_xg(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
@@ -77,7 +78,7 @@ def forecast_national_ecmwf_and_xg(db_session):
             gsp_ids=gsp_ids,
             session=db_session,
             model_name=model_name,
-            n_fake_forecasts=16,
+            n_fake_forecasts=120,
             t0_datetime_utc=t0_datetime_utc,  # add
         )  # add
         for f in forecasts:

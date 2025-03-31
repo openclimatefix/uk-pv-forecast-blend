@@ -42,10 +42,6 @@ def get_most_recent_forecast_ids(
 ) -> pd.DataFrame:
     """Retrieves the most recent forecast IDs for specified models for each location.
 
-    This function uses a window function to rank forecasts by creation time for each
-    (location, model) combination, selecting only the most recent forecast that is within
-    an acceptable delay from the provided reference time.
-
     Args:
         session: Database session
         model_names: List of model names to filter to
@@ -70,8 +66,8 @@ def get_most_recent_forecast_ids(
         MLModelSQL.name,
     ]
     
-    # Build subquery that joins the ForecastSQL and MLModelSQL tables,
-    # applies filters, and calculates the row_number
+    # Build query that joins the ForecastSQL and MLModelSQL tables, applies filters, 
+    # and takes the most recent row for each (model, location) pair
     query = (
         session.query(*forecast_columns)
         .distinct(ForecastSQL.location_id, MLModelSQL.name)
@@ -107,9 +103,9 @@ def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[st
     # TODO: Use the saved forecast initialisation time when available
     # https://github.com/openclimatefix/nowcasting_datamodel/issues/315
     # Approximate the forecast initialisation time
-    df_forecast_ids["initialisation_datetime_utc"] = pd.to_datetime(
-        df_forecast_ids["forecast_creation_time"].values
-    ).floor("30min")
+    df_forecast_ids["initialisation_datetime_utc"] = (
+        df_forecast_ids["forecast_creation_time"].dt.floor("30min")
+    )
     
     df_forecast_ids["delay"] = t0 - df_forecast_ids["initialisation_datetime_utc"]
     
@@ -468,7 +464,7 @@ def get_regional_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
         kernel=BLEND_KERNEL, 
         score_func=make_avg_mae_func(8),
     )
-        
+    
     # Filter out any models which are not used in this blend
     weights_df = weights_df.loc[:, weights_df.sum(axis=0) > 0]
 

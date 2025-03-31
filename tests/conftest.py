@@ -1,15 +1,15 @@
 import os
 from datetime import datetime, timedelta, timezone
+import time_machine
 
 import pytest
+from testcontainers.postgres import PostgresContainer
+
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts
 from nowcasting_datamodel.save.save import save
 
 from forecast_blend.weights import model_names
-from testcontainers.postgres import PostgresContainer
-import time_machine
-
 
 
 @pytest.fixture
@@ -31,8 +31,8 @@ def forecasts(db_session):
             session=db_session,
             model_name=model_name,
             n_fake_forecasts=16,
-            t0_datetime_utc=t0_datetime_utc,  # add
-        )  # add
+            t0_datetime_utc=t0_datetime_utc,
+        )
         
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
@@ -55,8 +55,8 @@ def forecast_national(db_session):
             session=db_session,
             model_name=model_name,
             n_fake_forecasts=16,
-            t0_datetime_utc=t0_datetime_utc,  # add
-        )  # add
+            t0_datetime_utc=t0_datetime_utc,
+        )
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
@@ -79,8 +79,8 @@ def forecast_national_ecmwf_and_xg(db_session):
             session=db_session,
             model_name=model_name,
             n_fake_forecasts=120,
-            t0_datetime_utc=t0_datetime_utc,  # add
-        )  # add
+            t0_datetime_utc=t0_datetime_utc,
+        )
         for f in forecasts:
             for fv in f.forecast_values:
                 fv.expected_power_generation_megawatts = i

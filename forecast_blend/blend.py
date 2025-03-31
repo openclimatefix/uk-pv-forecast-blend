@@ -7,7 +7,6 @@
 
 import json
 from datetime import datetime
-from typing import List, Optional
 
 import pandas as pd
 import structlog
@@ -30,8 +29,8 @@ def get_blend_forecast_values_latest(
     session: Session,
     gsp_id: int,
     weights_df: pd.DataFrame,
-    start_datetime: Optional[datetime] = None,
-) -> List[ForecastValue]:
+    start_datetime: datetime | None = None,
+) -> list[ForecastValue]:
     """
     Get forecast values
 
@@ -94,16 +93,14 @@ def get_blend_forecast_values_latest(
         )
 
     # convert back to list of forecast values
-    forecast_values = convert_df_to_list_forecast_values(forecast_values_blended)
-
-    return forecast_values
+    return convert_df_to_list_forecast_values(forecast_values_blended)
 
 
 def add_p_levels_to_forecast_values(
     blended_df: pd.DataFrame,
     all_model_df: pd.DataFrame,
     weights_df: pd.DataFrame,
-):
+) -> pd.DataFrame:
     """
     Add properties to blended forecast values.
 

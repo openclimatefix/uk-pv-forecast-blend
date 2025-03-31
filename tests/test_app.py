@@ -1,8 +1,6 @@
-import logging
-
 import pandas as pd
+import time_machine
 
-from app import app, is_last_forecast_made_before_last_30_minutes_step
 from nowcasting_datamodel.models import LocationSQL
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
@@ -11,14 +9,15 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 from nowcasting_datamodel.models.models import MLModelSQL
-import time_machine
 
-logger = logging.getLogger(__name__)
+from app import app, is_last_forecast_made_before_last_30_minutes_step
+
 
 @time_machine.travel("2023-01-01 00:00:01")
 def test_is_last_forecast_longer_30_minutes(db_session):
 
     assert is_last_forecast_made_before_last_30_minutes_step(db_session)
+
 
 @time_machine.travel("2023-01-01 00:00:01")
 def test_is_last_forecast_longer_30_minutes_dont_create(db_session, forecasts):
@@ -28,6 +27,7 @@ def test_is_last_forecast_longer_30_minutes_dont_create(db_session, forecasts):
     f[0].model.name = "blend"
 
     assert not is_last_forecast_made_before_last_30_minutes_step(db_session)
+
 
 @time_machine.travel("2023-01-01 00:00:01")
 def test_app(db_session, forecasts):
@@ -141,11 +141,15 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
             "2022-12-31 23:30",
             "2023-01-01 11:30",
             freq="30min",
+            tz="UTC",
         ),
     )
 
     for i, fv in enumerate(fvs):
-        assert fv.expected_power_generation_megawatts == expected_values.values[i], f'{fv.expected_power_generation_megawatts} {fv.target_time}'
+        assert (
+            (fv.expected_power_generation_megawatts, fv.target_time)
+             == (expected_values.values[i], expected_values.index[i])
+        )
 
     assert len(db_session.query(ForecastValueSQL).all()) == (N * number_of_forecast_values) + 25
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N * number_of_forecast_values) + 25

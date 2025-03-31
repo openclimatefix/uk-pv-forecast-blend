@@ -1,19 +1,14 @@
-import logging
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 from blend import get_blend_forecast_values_latest
-from freezegun import freeze_time
+import time_machine
 from nowcasting_datamodel.fake import make_fake_forecasts
 from nowcasting_datamodel.models.forecast import ForecastValueLatestSQL
 from nowcasting_datamodel.read.read_models import get_model
 
-logger = logging.getLogger(__name__)
 
 
-
-
-
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def test_get_blend_forecast_values_latest_one_model(db_session):
     model = get_model(session=db_session, name="test_1", version="0.0.1")
 
@@ -69,7 +64,7 @@ def test_get_blend_forecast_values_latest_one_model(db_session):
     assert forecast_values_read[0]._properties == {"10": 0.9, "90": 1.1}
 
 
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
@@ -128,7 +123,7 @@ def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
     assert forecast_values_read[0]._properties == {"10": 0.9, "90": 1.1}
 
 
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
@@ -226,8 +221,7 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
     assert forecast_values_read[5]._adjust_mw == 200
 
 
-
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def test_get_blend_forecast_values_latest_negative(db_session):
     """This test makes sure that the blend function changes negatives to zeros"""
 
@@ -297,7 +291,7 @@ def test_get_blend_forecast_values_latest_negative(db_session):
     assert forecast_values_read[3]._adjust_mw == 2.0
 
 
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def test_get_blend_forecast_values_latest_no_properties(db_session):
     """This test checks that when there are no _properties, an empty dictionary is returned"""
 
@@ -346,7 +340,7 @@ def test_get_blend_forecast_values_latest_no_properties(db_session):
         assert forecast_value._properties == {}
 
 
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def test_get_blend_forecast_values_latest_negative_two(db_session):
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
@@ -407,7 +401,7 @@ def test_get_blend_forecast_values_latest_negative_two(db_session):
     assert forecast_values_read[3].expected_power_generation_megawatts == 0
 
 
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def test_get_blend_forecast_three_models(db_session):
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
@@ -485,7 +479,7 @@ def test_get_blend_forecast_three_models(db_session):
     assert forecast_values_read[4].expected_power_generation_megawatts == 2.5
 
 
-@freeze_time("2023-01-01 00:00:01")
+@time_machine.travel("2023-01-01 00:00:01")
 def test_get_blend_forecast_three_models_with_gap(db_session):
     """
     The idea of this test its to make a gap in the one of the forecast,

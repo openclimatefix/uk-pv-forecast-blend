@@ -10,9 +10,11 @@ For each GSP
 import os
 import json
 from datetime import datetime, timedelta, timezone
-from typing import List
 import sentry_sdk
 import structlog
+
+from sqlalchemy.orm.session import Session
+
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models import (
     ForecastValue,
@@ -53,7 +55,7 @@ sentry_sdk.set_tag("app_name", "uk_pv_forecast_blend")
 sentry_sdk.set_tag("version", __version__)
 
 
-def app(gsps: List[int] = None):
+def app(gsps: list[int] | None = None) -> None:
     """run main app"""
 
     if gsps is None:
@@ -141,7 +143,7 @@ def app(gsps: List[int] = None):
     logger.info("Finished")
 
 
-def get_blend_model(session):
+def get_blend_model(session: Session) -> MLModelSQL:
     """Get the blend model
 
     The version is made up of all the models version for example
@@ -158,12 +160,11 @@ def get_blend_model(session):
     all_version = json.dumps(models)
 
     # get model object from database
-    model = get_model(name="blend", version=all_version, session=session)
-    return model
+    return get_model(name="blend", version=all_version, session=session)
 
 
 def make_forecast(
-    forecast_values: List[ForecastValue],
+    forecast_values: list[ForecastValue],
     model: MLModelSQL,
     location: LocationSQL,
     input_data_last_updated: InputDataLastUpdatedSQL,
@@ -198,7 +199,7 @@ def make_forecast(
     )
 
 
-def is_last_forecast_made_before_last_30_minutes_step(session):
+def is_last_forecast_made_before_last_30_minutes_step(session: Session):
     """
     Save the forecast to the database every 30 minutes
 

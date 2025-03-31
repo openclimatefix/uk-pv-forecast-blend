@@ -80,7 +80,7 @@ def get_most_recent_forecast_ids(
     return pd.read_sql(query.statement, query.session.bind)
 
 
-def _get_most_recent_row(df):
+def _get_most_recent_row(df: pd.DataFrame) -> pd.Series:
     return df.sort_values("forecast_creation_time", ascending=False).iloc[0]
 
 

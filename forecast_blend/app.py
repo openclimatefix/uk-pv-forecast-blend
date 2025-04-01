@@ -81,6 +81,9 @@ def app(gsps: list[int] | None = None) -> None:
         national_weights_df = backfill_weights(national_weights_df, start_datetime)
         regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
 
+        logger.info(f"Weights for national blend: {national_weights_df}")
+        logger.info(f"Weights for regional blend: {regional_weights_df}")
+
         # Get the latest input data
         input_data_last_updated = get_latest_input_data_last_updated(session=session)
         # This is not quite right as the forecast could have been made with an earlier version,

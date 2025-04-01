@@ -40,7 +40,7 @@ def get_most_recent_forecast_ids(
     t0: pd.Timestamp, 
     max_delay: pd.Timedelta,
 ) -> pd.DataFrame:
-    """Retrieves the most recent forecast IDs for specified models for each location.
+    """Gets the most recent forecast IDs and creation times for specified models for each location.
 
     Args:
         session: Database session

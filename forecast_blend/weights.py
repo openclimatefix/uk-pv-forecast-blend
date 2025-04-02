@@ -34,7 +34,7 @@ def get_horizon_maes() -> pd.DataFrame:
     return df_maes.set_index("horizon")
 
 
-def get_most_recent_forecast_ids(
+def get_latest_forecast_metadata(
     session: Session, 
     model_names: list[str], 
     t0: pd.Timestamp, 
@@ -89,7 +89,7 @@ def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[st
     
     Args:
         df_forecast_ids: DataFrame of the most recent forecast IDs for each model and location. 
-            See `get_most_recent_forecast_ids()`.
+            See `get_latest_forecast_metadata()`.
         t0: The blend forecast init time
     
     """
@@ -350,7 +350,7 @@ def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
-    df_latest_forecast_ids = get_most_recent_forecast_ids(
+    df_latest_forecast_ids = get_latest_forecast_metadata(
         session=session, 
         model_names=model_names, 
         t0=t0, 
@@ -441,7 +441,7 @@ def get_regional_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
-    df_latest_forecast_ids = get_most_recent_forecast_ids(
+    df_latest_forecast_ids = get_latest_forecast_metadata(
         session=session, 
         model_names=all_regional_models, 
         t0=t0, 

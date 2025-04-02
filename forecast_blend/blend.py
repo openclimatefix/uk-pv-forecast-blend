@@ -1,25 +1,18 @@
 """ Blends forecasts together
 
-1. creates weights for blending
-2. get forecast values for each model
-3. blends them together
+1. get forecast values for each model
+2. blends them together
 
 """
 
 import json
 from datetime import datetime
-from typing import List, Optional
 
 import pandas as pd
 import structlog
-from nowcasting_datamodel.models.forecast import (
-    ForecastValue,
-    ForecastValueSevenDaysSQL,
-)
-from nowcasting_datamodel.read.read import (
-    get_forecast_values,
-    get_forecast_values_latest,
-)
+from nowcasting_datamodel.models.forecast import ForecastValue
+from nowcasting_datamodel.read.read import get_forecast_values_latest
+
 from sqlalchemy.orm.session import Session
 
 from utils import (
@@ -28,7 +21,6 @@ from utils import (
     convert_df_to_list_forecast_values,
     convert_list_forecast_values_to_df,
 )
-from weights import make_weights_df
 
 logger = structlog.stdlib.get_logger()
 
@@ -36,21 +28,18 @@ logger = structlog.stdlib.get_logger()
 def get_blend_forecast_values_latest(
     session: Session,
     gsp_id: int,
-    start_datetime: Optional[datetime] = None,
-    model_names: Optional[List[str]] = None,
-    weights: Optional[List[float]] = None,
-    forecast_horizon_minutes: Optional[int] = None,
-) -> List[ForecastValue]:
+    weights_df: pd.DataFrame,
+    start_datetime: datetime | None = None,
+) -> list[ForecastValue]:
     """
     Get forecast values
 
     :param session: database session
     :param gsp_id: gsp id, to filter query on
+    :param weights_df: dataframe of weights to use for blending,
+        see structure in weights.py - get_national_blend_weights
     :param start_datetime: optional to filterer target_time by start_datetime
         If None is given then all are returned.
-    :param model_names: list of model names to use for blending
-    :param weights: list of weights to use for blending, see structure in make_weights_df
-    :param forecast_horizon_minutes: The forecast horizon to blend together
 
     return: List of forecasts values blended from different models
     """
@@ -59,38 +48,18 @@ def get_blend_forecast_values_latest(
         f"Getting blend forecast for gsp_id {gsp_id} and start_datetime {start_datetime}"
     )
 
-    if model_names is None:
-        model_names = ["cnn", "National_xg"]
-    if len(model_names) > 1:
-        weights_df = make_weights_df(
-            model_names,
-            weights,
-            start_datetime,
-            forecast_horizon_minutes=forecast_horizon_minutes,
-        )
-    else:
-        weights_df = None
+    model_names = weights_df.columns
 
     # get forecast for the different models
     forecast_values_all_model = []
     for model_name in model_names:
-        if forecast_horizon_minutes is None:
-            forecast_values_one_model = get_forecast_values_latest(
-                session=session,
-                gsp_id=gsp_id,
-                start_datetime=start_datetime,
-                model_name=model_name,
-            )
-        else:
-            forecast_values_one_model = get_forecast_values(
-                session=session,
-                gsp_ids=[gsp_id],
-                start_datetime=start_datetime,
-                only_return_latest=True,
-                forecast_horizon_minutes=forecast_horizon_minutes,
-                model=ForecastValueSevenDaysSQL,
-                model_name=model_name,
-            )
+        forecast_values_one_model = get_forecast_values_latest(
+            session=session,
+            gsp_id=gsp_id,
+            start_datetime=start_datetime,
+            model_name=model_name,
+        )
+
 
         if len(forecast_values_one_model) == 0:
             logger.debug(
@@ -106,28 +75,13 @@ def get_blend_forecast_values_latest(
             forecast_values_all_model.append([model_name, forecast_values_one_model])
 
     # check the created_utc is valid for each forecast
-    forecast_values_all_model_valid = check_forecast_created_utc(
-        forecast_values_all_model
-    )
-
-    # This is a hard code fix, and soon we plan to improve blending, by using dynamic weights from the
-    # MAE results from the ML experiments #39
-    # if pvnet_v2 is not in model names, then change the weights for pvnet_v2 to pvnet_ecmwf
-    if "pvnet_v2" not in [model_name for model_name, _ in forecast_values_all_model_valid]:
-        logger.warning(f"Changing pvnet_v2 to pvnet_ecmwf in weights_df, as pvnet v2 model has not be loaded, "
-                       f"or is out of date. This is a hard code fix, and soon we plan to improve blending. ")
-        if (weights_df is not None) and ("pvnet_v2" in weights_df.columns):
-            weights_df.rename(columns={"pvnet_v2": "pvnet_ecmwf"}, inplace=True)
+    forecast_values_all_model_valid = check_forecast_created_utc(forecast_values_all_model)
 
     # make into dataframe
-    forecast_values_all_model = convert_list_forecast_values_to_df(
-        forecast_values_all_model_valid
-    )
+    forecast_values_all_model = convert_list_forecast_values_to_df(forecast_values_all_model_valid)
 
     # blend together
-    forecast_values_blended = blend_forecasts_together(
-        forecast_values_all_model, weights_df
-    )
+    forecast_values_blended = blend_forecasts_together(forecast_values_all_model, weights_df)
 
     # add properties
     if gsp_id == 0:
@@ -139,16 +93,14 @@ def get_blend_forecast_values_latest(
         )
 
     # convert back to list of forecast values
-    forecast_values = convert_df_to_list_forecast_values(forecast_values_blended)
-
-    return forecast_values
+    return convert_df_to_list_forecast_values(forecast_values_blended)
 
 
 def add_p_levels_to_forecast_values(
     blended_df: pd.DataFrame,
     all_model_df: pd.DataFrame,
     weights_df: pd.DataFrame,
-):
+) -> pd.DataFrame:
     """
     Add properties to blended forecast values.
 

@@ -1,6 +1,5 @@
 """Utils for blending forecasts together"""
 from datetime import datetime, timedelta, timezone
-from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -10,7 +9,9 @@ from nowcasting_datamodel.models import ForecastValue
 logger = structlog.stdlib.get_logger()
 
 
-def check_forecast_created_utc(forecast_values_all_model) -> List[Union[str, List[ForecastValue]]]:
+def check_forecast_created_utc(
+    forecast_values_all_model: list[tuple[str, list[ForecastValue]]]
+) -> list[tuple[str, list[ForecastValue]]]:
     """
     Check if forecasts are valid.
 
@@ -30,9 +31,9 @@ def check_forecast_created_utc(forecast_values_all_model) -> List[Union[str, Lis
 
         one_forecast_created = forecast_values_one_model[-1].created_utc
 
-        one_forecast_created_within_timedelta = one_forecast_created > datetime.now(
-            timezone.utc
-        ) - timedelta(hours=6)
+        one_forecast_created_within_timedelta = (
+            one_forecast_created > datetime.now(timezone.utc) - timedelta(hours=6)
+        )
 
         if one_forecast_created_within_timedelta:
             logger.debug(
@@ -47,10 +48,13 @@ def check_forecast_created_utc(forecast_values_all_model) -> List[Union[str, Lis
         # use all forecast:
         logger.debug("using all forecasts as all are older than 6 hours")
         forecast_values_all_model_valid = forecast_values_all_model
+    
     return forecast_values_all_model_valid
 
 
-def convert_list_forecast_values_to_df(forecast_values_all_model_valid):
+def convert_list_forecast_values_to_df(
+    forecast_values_all_model_valid: list[tuple[str, list[ForecastValue]]]
+) -> pd.DataFrame:
     """
     Convert list of forecast values to a pandas dataframe
 
@@ -101,7 +105,9 @@ def convert_list_forecast_values_to_df(forecast_values_all_model_valid):
     return forecast_values_all_model
 
 
-def convert_df_to_list_forecast_values(forecast_values_blended: pd.DataFrame):
+def convert_df_to_list_forecast_values(
+    forecast_values_blended: pd.DataFrame
+) -> list[ForecastValue]:
     """
     Convert the blended dataframe to a list of ForecastValue objects
 
@@ -139,9 +145,11 @@ def convert_df_to_list_forecast_values(forecast_values_blended: pd.DataFrame):
     return forecast_values
 
 
-def blend_forecasts_together(forecast_values_all_model,
-                             weights_df,
-                             column_name_to_blend: str = "expected_power_generation_megawatts"):
+def blend_forecasts_together(
+    forecast_values_all_model: pd.DataFrame,
+    weights_df: pd.DataFrame,
+    column_name_to_blend: str = "expected_power_generation_megawatts"
+) -> pd.DataFrame:
     """
     Blend the forecasts together using the weights_df
 
@@ -268,16 +276,14 @@ def blend_forecasts_together(forecast_values_all_model,
     forecast_values_blended = pd.concat(forecast_values_blended, axis=0)
 
     # sort by target time
-    forecast_values_blended.sort_values(by=["target_time"], inplace=True)
-
-    return forecast_values_blended
+    return forecast_values_blended.sort_values(by=["target_time"])
 
 
 def blend_together_one_target_time(
     forecast_values_one_target_time: pd.DataFrame,
     target_time: datetime,
     variable_to_blend: str = "expected_power_generation_megawatts",
-):
+) -> pd.DataFrame:
     """
     Blend forecasts for one target time together using the weights
 
@@ -313,12 +319,10 @@ def blend_together_one_target_time(
     )
     # make sure target_time is a columns
     forecast_values_one_target_time_blend["target_time"] = target_time
-    forecast_values_one_target_time_blend.reset_index(inplace=True, drop=True)
-
-    return forecast_values_one_target_time_blend
+    return forecast_values_one_target_time_blend.reset_index(drop=True)
 
 
-def get_start_datetime():
+def get_start_datetime() -> datetime:
     """
     Get the start datetime for the blending.
 

@@ -10,9 +10,11 @@ For each GSP
 import os
 import json
 from datetime import datetime, timedelta, timezone
-from typing import List
 import sentry_sdk
 import structlog
+
+from sqlalchemy.orm.session import Session
+
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models import (
     ForecastValue,
@@ -31,7 +33,13 @@ from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from blend import get_blend_forecast_values_latest
 from utils import get_start_datetime
-from weights import weights, model_names
+from weights import (
+    model_names,
+    backfill_weights, 
+    get_national_blend_weights, 
+    get_regional_blend_weights,
+)
+import pandas as pd
 
 logger = structlog.stdlib.get_logger()
 
@@ -47,7 +55,7 @@ sentry_sdk.set_tag("app_name", "uk_pv_forecast_blend")
 sentry_sdk.set_tag("version", __version__)
 
 
-def app(gsps: List[int] = None):
+def app(gsps: list[int] | None = None) -> None:
     """run main app"""
 
     if gsps is None:
@@ -60,10 +68,21 @@ def app(gsps: List[int] = None):
     connection = DatabaseConnection(url=os.getenv("DB_URL", "not_set"), echo=False)
 
     start_datetime = get_start_datetime()
+    t0 = pd.Timestamp.utcnow().floor("30min")
+
 
     with connection.get_session() as session:
 
         model = get_blend_model(session)
+
+        national_weights_df = get_national_blend_weights(session, t0)
+        regional_weights_df = get_regional_blend_weights(session, t0)
+
+        national_weights_df = backfill_weights(national_weights_df, start_datetime)
+        regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
+
+        logger.info(f"Weights for national blend: {national_weights_df}")
+        logger.info(f"Weights for regional blend: {regional_weights_df}")
 
         # Get the latest input data
         input_data_last_updated = get_latest_input_data_last_updated(session=session)
@@ -82,8 +101,7 @@ def app(gsps: List[int] = None):
                     session=session,
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,
-                    weights=weights,
-                    model_names=model_names,
+                    weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
                 )
 
                 # make Forecast SQL
@@ -128,7 +146,7 @@ def app(gsps: List[int] = None):
     logger.info("Finished")
 
 
-def get_blend_model(session):
+def get_blend_model(session: Session) -> MLModelSQL:
     """Get the blend model
 
     The version is made up of all the models version for example
@@ -145,12 +163,11 @@ def get_blend_model(session):
     all_version = json.dumps(models)
 
     # get model object from database
-    model = get_model(name="blend", version=all_version, session=session)
-    return model
+    return get_model(name="blend", version=all_version, session=session)
 
 
 def make_forecast(
-    forecast_values: List[ForecastValue],
+    forecast_values: list[ForecastValue],
     model: MLModelSQL,
     location: LocationSQL,
     input_data_last_updated: InputDataLastUpdatedSQL,
@@ -185,7 +202,7 @@ def make_forecast(
     )
 
 
-def is_last_forecast_made_before_last_30_minutes_step(session):
+def is_last_forecast_made_before_last_30_minutes_step(session: Session):
     """
     Save the forecast to the database every 30 minutes
 

@@ -1,7 +1,7 @@
 nowcasting_datamodel==1.5.56
 numpy
 pandas
-freezegun
+time_machine
 pytest
 testcontainers
 sentry-sdk==2.13.0

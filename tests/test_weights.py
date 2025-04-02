@@ -1,110 +1,71 @@
-from datetime import datetime, timezone, timedelta
+import numpy as np
+import pandas as pd
 
-from freezegun import freeze_time
-from weights import make_weights_df
+import time_machine
+from weights import (
+    get_national_blend_weights, get_regional_blend_weights, get_horizon_maes, model_names
+)
 
 
-@freeze_time("2023-01-02 00:00:01")
-def test_make_weights_df_yesterday():
-    start_datetime = datetime(2023, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+def test_get_horizon_maes():
+    # Just check the function can run
+    df = get_horizon_maes()
+    
+    # Check all the expected models are present
+    assert set(model_names) - set(df.columns) == set()
 
-    weights = make_weights_df(
-        model_names=["test_1", "test_2"], weights=None, start_datetime=start_datetime
-    )
-    assert len(weights) == 49 + 17
-    assert "test_1" in weights.columns
-    assert "test_2" in weights.columns
 
-    assert weights.index[0].isoformat() == start_datetime.isoformat()
+@time_machine.travel("2023-01-01 00:00:01")
+def test_get_national_blend_weights(forecast_national_ecmwf_and_xg, db_session):
+    t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
+
+    weights_df = get_national_blend_weights(session=db_session, t0=t0)
+
+    # Check columns and indices
+    assert set(weights_df.columns)==set(["pvnet_ecmwf", "National_xg"])
     assert (
-        weights.index[15].isoformat()
-        == (start_datetime + timedelta(hours=7, minutes=30)).isoformat()
+        pd.date_range("2023-01-01 00:30", "2023-01-02 12:00", freq="30min", tz="UTC")
+        .equals(weights_df.index)
     )
 
-    assert weights["test_1"][0] == 1
-    assert weights["test_2"][0] == 0
+    # Weights sum to 1 for each time step
+    assert (weights_df.sum(axis=1).values==1).all()
 
-    assert weights["test_1"][49] == 1
-    assert weights["test_2"][49] == 0
+    # pvnet_ecmwf should be used for the first 16 time steps then not available
+    assert (weights_df["pvnet_ecmwf"][:16].values>0).all()
+    assert np.isnan(weights_df["pvnet_ecmwf"][16:]).all()
 
-    assert weights["test_1"][49 + 3] == 1
-    assert weights["test_2"][49 + 3] == 0
-
-    assert weights["test_1"][49 + 7] == 0.5
-    assert weights["test_2"][49 + 7] == 0.5
-
-    assert weights["test_1"][49 + 11] == 0
-    assert weights["test_2"][49 + 11] == 1
-
-    assert weights["test_1"][49 + 15] == 0
-    assert weights["test_2"][49 + 15] == 1
+    # National_xg should be used for all timesteps after 16
+    assert (weights_df["National_xg"][16:].values==1).all()
 
 
-@freeze_time("2023-01-01 00:00:01")
-def test_make_weights_df():
-    start_datetime = datetime(2023, 1, 1, 0, 30, tzinfo=timezone.utc)
+@time_machine.travel("2023-01-01 00:00:01")
+def test_get_regional_blend_weights(forecast_national_ecmwf_and_xg, db_session):
+    t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
 
-    weights = make_weights_df(model_names=["test_1", "test_2"], weights=None)
-    assert len(weights) == 17
-    assert "test_1" in weights.columns
-    assert "test_2" in weights.columns
+    weights_df = get_regional_blend_weights(session=db_session, t0=t0)
 
-    assert weights.index[0].isoformat() == start_datetime.isoformat()
+    # For regional we can only use pvnet_ecmwf since National_xg is only for national
+    
+    # Check columns and indices
+    assert weights_df.columns==["pvnet_ecmwf"]
     assert (
-        weights.index[15].isoformat()
-        == (start_datetime + timedelta(hours=7, minutes=30)).isoformat()
+        pd.date_range("2023-01-01 00:30", "2023-01-01 08:00", freq="30min", tz="UTC")
+        .equals(weights_df.index)
     )
 
-    assert weights["test_1"][0] == 1
-    assert weights["test_2"][0] == 0
+    # We use pvnet_ecmwf exclusively for all time steps
+    assert (weights_df.values==1).all()
 
-    assert weights["test_1"][3] == 1
-    assert weights["test_2"][3] == 0
-
-    assert weights["test_1"][7] == 0.5
-    assert weights["test_2"][7] == 0.5
-
-    assert weights["test_1"][11] == 0
-    assert weights["test_2"][11] == 1
-
-    assert weights["test_1"][15] == 0
-    assert weights["test_2"][15] == 1
-
-
-@freeze_time("2023-01-01 00:00:01")
-def test_make_weights_df_forecast_horizon():
-    start_datetime = datetime(2023, 1, 1, 0, 30, tzinfo=timezone.utc)
-
-    weights = make_weights_df(
-        model_names=["test_1", "test_2"], weights=None, forecast_horizon_minutes=60 * 3
-    )
-    assert len(weights) == 17
-    assert "test_1" in weights.columns
-    assert "test_2" in weights.columns
-
-    assert weights.index[0].isoformat() == start_datetime.isoformat()
+    # In this case the weights should start at 2h later since the forecast is 2h old
+    weights_df = get_regional_blend_weights(session=db_session, t0=t0+pd.Timedelta("2h"))
+    
+    # Check columns and indices
+    assert weights_df.columns==["pvnet_ecmwf"]
     assert (
-        weights.index[15].isoformat()
-        == (start_datetime + timedelta(hours=7, minutes=30)).isoformat()
+        pd.date_range("2023-01-01 02:30", "2023-01-01 08:00", freq="30min", tz="UTC")
+        .equals(weights_df.index)
     )
 
-    assert weights["test_1"][0] == 0.75
-    assert weights["test_2"][0] == 0.25
+    assert (weights_df.values==1).all()
 
-    assert weights["test_1"][15] == 0.75
-    assert weights["test_2"][15] == 0.25
-
-    assert (weights["test_1"] == 0.75).all()
-    assert (weights["test_2"] == 0.25).all()
-
-    weights = make_weights_df(
-        model_names=["test_1", "test_2"], weights=None, forecast_horizon_minutes=-1
-    )
-    assert (weights["test_1"] == 1.0).all()
-    assert (weights["test_2"] == 0.0).all()
-
-    weights = make_weights_df(
-        model_names=["test_1", "test_2"], weights=None, forecast_horizon_minutes=10000
-    )
-    assert (weights["test_1"] == 0.0).all()
-    assert (weights["test_2"] == 1.0).all()

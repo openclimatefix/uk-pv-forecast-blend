@@ -1,16 +1,19 @@
 import os
 from datetime import datetime, timedelta, timezone
+import time_machine
 
 import pytest
+from testcontainers.postgres import PostgresContainer
+
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts
 from nowcasting_datamodel.save.save import save
 
 from forecast_blend.weights import model_names
-from testcontainers.postgres import PostgresContainer
 
 
 @pytest.fixture
+@time_machine.travel("2023-01-01 00:00:01")
 def forecasts(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
@@ -28,14 +31,16 @@ def forecasts(db_session):
             session=db_session,
             model_name=model_name,
             n_fake_forecasts=16,
-            t0_datetime_utc=t0_datetime_utc,  # add
-        )  # add
+            t0_datetime_utc=t0_datetime_utc,
+        )
+        
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
     return None
 
 @pytest.fixture
+@time_machine.travel("2023-01-01 00:00:00")
 def forecast_national(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
@@ -50,16 +55,17 @@ def forecast_national(db_session):
             session=db_session,
             model_name=model_name,
             n_fake_forecasts=16,
-            t0_datetime_utc=t0_datetime_utc,  # add
-        )  # add
+            t0_datetime_utc=t0_datetime_utc,
+        )
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
     return None
 
 @pytest.fixture
+@time_machine.travel("2023-01-01 00:00:00")
 def forecast_national_ecmwf_and_xg(db_session):
-    t0_datetime_utc = (datetime.now(tz=timezone.utc) + timedelta(days=2)).replace(minute=0, second=0, microsecond=0)
+    t0_datetime_utc = datetime.now(tz=timezone.utc)
     # time detal of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
@@ -72,9 +78,9 @@ def forecast_national_ecmwf_and_xg(db_session):
             gsp_ids=gsp_ids,
             session=db_session,
             model_name=model_name,
-            n_fake_forecasts=16,
-            t0_datetime_utc=t0_datetime_utc,  # add
-        )  # add
+            n_fake_forecasts=120,
+            t0_datetime_utc=t0_datetime_utc,
+        )
         for f in forecasts:
             for fv in f.forecast_values:
                 fv.expected_power_generation_megawatts = i

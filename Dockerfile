@@ -20,7 +20,7 @@ COPY tests/ app/tests/
 WORKDIR /app
 
 # install library
-RUN pip install -e .
+RUN export PYTHONPATH=${PYTHONPATH}:./forecast_blend
 
 RUN if [ "$TESTING" = 1 ]; then pip install pytest pytest-cov coverage; fi
 

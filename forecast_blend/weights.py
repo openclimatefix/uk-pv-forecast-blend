@@ -1,11 +1,11 @@
 """Functions to make weights for blending"""
 
 import numpy as np
+import os
 import pandas as pd
 from typing import Callable
 from datetime import timezone
 
-from importlib.resources import files
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 import structlog
@@ -28,7 +28,7 @@ def get_horizon_maes() -> pd.DataFrame:
         A pandas DataFrame with pd.Timedelta horizons as the index and MAEs per model
         in the columns.
     """
-    filepath = files('forecast_blend') / 'data' / 'model_horizon_mae_scores.csv'
+    filepath = os.path.dirname(os.path.realpath(__file__)) + '/data/model_horizon_mae_scores.csv'
     df_maes = pd.read_csv(filepath, index_col=0).reset_index(names="horizon")
     df_maes["horizon"] = pd.to_timedelta(df_maes["horizon"]).to_numpy()
     return df_maes.set_index("horizon")

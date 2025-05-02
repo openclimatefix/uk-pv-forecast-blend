@@ -43,7 +43,7 @@ import pandas as pd
 
 logger = structlog.stdlib.get_logger()
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),

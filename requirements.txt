@@ -1,4 +1,4 @@
-nowcasting_datamodel==1.6.3
+nowcasting_datamodel==1.7.1
 numpy
 pandas
 time_machine

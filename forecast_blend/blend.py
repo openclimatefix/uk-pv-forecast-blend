@@ -7,9 +7,9 @@
 
 import json
 from datetime import datetime
+from loguru import logger
 
 import pandas as pd
-import structlog
 from nowcasting_datamodel.models.forecast import ForecastValue
 from nowcasting_datamodel.read.read import get_forecast_values_latest
 
@@ -22,7 +22,6 @@ from utils import (
     convert_list_forecast_values_to_df,
 )
 
-logger = structlog.stdlib.get_logger()
 
 
 def get_blend_forecast_values_latest(

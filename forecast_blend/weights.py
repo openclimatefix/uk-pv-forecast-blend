@@ -5,12 +5,12 @@ import os
 import pandas as pd
 from typing import Callable
 from datetime import timezone
+from loguru import logger
 
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 import structlog
 
-logger = structlog.stdlib.get_logger()
 
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]

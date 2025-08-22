@@ -9,6 +9,7 @@ For each GSP
 
 import os
 import json
+import sys
 from datetime import datetime, timedelta, timezone
 import sentry_sdk
 from loguru import logger
@@ -51,6 +52,9 @@ sentry_sdk.init(
 
 sentry_sdk.set_tag("app_name", "uk_pv_forecast_blend")
 sentry_sdk.set_tag("version", __version__)
+
+logger.remove(0)
+logger.add(sys.stderr, level=os.getenv("LOG_LEVEL", "INFO"))
 
 
 def app(gsps: list[int] | None = None) -> None:

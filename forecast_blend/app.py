@@ -11,7 +11,7 @@ import os
 import json
 from datetime import datetime, timedelta, timezone
 import sentry_sdk
-import structlog
+from loguru import logger
 
 from sqlalchemy.orm.session import Session
 
@@ -40,8 +40,6 @@ from weights import (
     get_regional_blend_weights,
 )
 import pandas as pd
-
-logger = structlog.stdlib.get_logger()
 
 __version__ = "1.1.5"
 

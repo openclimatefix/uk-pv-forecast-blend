@@ -1,12 +1,11 @@
 """Utils for blending forecasts together"""
 from datetime import datetime, timedelta, timezone
+from loguru import logger
 
 import numpy as np
 import pandas as pd
 import structlog
 from nowcasting_datamodel.models import ForecastValue
-
-logger = structlog.stdlib.get_logger()
 
 
 def check_forecast_created_utc(

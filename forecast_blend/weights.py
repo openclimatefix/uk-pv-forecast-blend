@@ -347,7 +347,9 @@ def get_national_blend_weights(
     
     df_mae = get_horizon_maes()
 
-    if exclude_models is not None:
+    if exclude_models is None:
+        model_names = [*ALL_MODEL_NAMES]
+    else:
         model_names = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
         df_mae = df_mae.drop(columns=exclude_models)
     

@@ -56,6 +56,9 @@ sentry_sdk.set_tag("version", __version__)
 logger.remove(0)
 logger.add(sys.stderr, level=os.getenv("LOG_LEVEL", "INFO"))
 
+BLEND_NAME = os.getenv("BLEND_NAME", "blend")
+ALLOW_CLOUDCASTING = os.getenv("ALLOW_CLOUDCASTING", "false").lower()=="true"
+
 
 def app(gsps: list[int] | None = None) -> None:
     """run main app"""
@@ -72,13 +75,17 @@ def app(gsps: list[int] | None = None) -> None:
     start_datetime = get_start_datetime()
     t0 = pd.Timestamp.utcnow().floor("30min")
 
+    if ALLOW_CLOUDCASTING:
+        exclude_models = None
+    else:
+        exclude_models = ["pvnet_cloud"]
 
     with connection.get_session() as session:
 
         model = get_blend_model(session)
 
-        national_weights_df = get_national_blend_weights(session, t0)
-        regional_weights_df = get_regional_blend_weights(session, t0)
+        national_weights_df = get_national_blend_weights(session, t0, exclude_models)
+        regional_weights_df = get_regional_blend_weights(session, t0, exclude_models)
 
         national_weights_df = backfill_weights(national_weights_df, start_datetime)
         regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
@@ -161,11 +168,11 @@ def get_blend_model(session: Session) -> MLModelSQL:
         models[model_name] = model.version
 
     # add blend version
-    models["blend"] = __version__
+    models[BLEND_NAME] = __version__
     all_version = json.dumps(models)
 
     # get model object from database
-    return get_model(name="blend", version=all_version, session=session)
+    return get_model(name=BLEND_NAME, version=all_version, session=session)
 
 
 def make_forecast(
@@ -216,7 +223,7 @@ def is_last_forecast_made_before_last_30_minutes_step(session: Session):
 
     query = session.query(ForecastSQL)
     query = query.join(MLModelSQL)
-    query = query.filter(MLModelSQL.name == "blend")
+    query = query.filter(MLModelSQL.name == BLEND_NAME)
     query = query.filter(ForecastSQL.historic == False)
     query = query.filter(ForecastSQL.created_utc > one_week_ago)
     query = query.order_by(ForecastSQL.forecast_creation_time.desc())

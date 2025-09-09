@@ -14,7 +14,7 @@ from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]
 INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_ecmwf", "pvnet_cloud"]
-model_names = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
+ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
 
 BLEND_KERNEL = [0.75, 0.5, 0.25]
 MIN_FORECAST_HORIZON = pd.Timedelta("30min")
@@ -348,7 +348,7 @@ def get_national_blend_weights(
     df_mae = get_horizon_maes()
 
     if exclude_models is not None:
-        model_names = [m for m in model_names if m not in exclude_models]
+        model_names = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
         df_mae = df_mae.drop(columns=exclude_models)
     
     # We need to have MAE-horizon values for all potential models
@@ -444,6 +444,7 @@ def get_regional_blend_weights(
           MAE data will not appear as columns or will have zero/NaN weights.
     """
 
+    # National_xg is not a regional model
     if exclude_models is None:
         exclude_models = ["National_xg"]
     else:
@@ -452,7 +453,7 @@ def get_regional_blend_weights(
     df_mae = get_horizon_maes().drop(columns=exclude_models)
 
     # We need to have MAE-horizon values for all potential models
-    all_regional_models = [m for m in model_names if m not in exclude_models]
+    all_regional_models = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
     assert len(set(all_regional_models) - set(df_mae.columns))==0
     
     # The maximum forecast horizon of any of the models

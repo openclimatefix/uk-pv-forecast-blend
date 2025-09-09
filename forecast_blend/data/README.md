@@ -22,11 +22,11 @@ Note that the blend does not take into account differing model performance for G
 predictions. Only a single score is used.
 
 For the current scores, we have taken the NMAE values for each model from the GSP-level validation 
-results of their training runs. This is true for all the intraday models, and for the 
-pvnet-day-ahead model. The intraday model's NMAEs were all measured on the same set of validation 
-samples but pvnet-day-ahead model was validated on a different set of samples. These scores are not
-fully compatible, but the blend-optimisation calculation seems to suggest reasonable blends between
-them. The National_xg model NMAEs are all set to 0.05. These were not measured and instead were set 
+results for the validation period (2022). This is true for all the intraday models, and for the 
+pvnet-day-ahead model. All models were assessed on the exact same init-timesand are
+fully compatible. 
+
+The National_xg model NMAEs are all set to 0.05. These were not measured and instead were set 
 as a value higher than all NMAEs for the other values. From observation we know that the National_xg
 model underperforms PVNet so we only want to use it in the blend if we have run out of PVNet 
 predictions.

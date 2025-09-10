@@ -6,7 +6,7 @@ ARG TESTING=0
 ARG GIT_PYTHON_REFRESH=quiet
 
 # copy files
-COPY readme.md app/readme.md
+COPY README.md app/README.md
 COPY requirements.txt app/requirements.txt
 
 # install requirements

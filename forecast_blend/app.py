@@ -42,7 +42,7 @@ from weights import (
 )
 import pandas as pd
 
-__version__ = "1.1.8"
+__version__ = "1.1.9"
 
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),

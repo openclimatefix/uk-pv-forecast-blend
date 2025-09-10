@@ -89,7 +89,7 @@ def test_app_twice(db_session, forecasts):
 def test_app_only_national(db_session, forecast_national):
 
     # Check the number forecasts have been made
-    # 1 National)
+    # 1 National
     # This is for pvnet_v2, pvnet_day_ahead, pvnet_ecmwf, pvnet_cloud, and National-xg
     N = 5
     # Doubled for historic and forecast

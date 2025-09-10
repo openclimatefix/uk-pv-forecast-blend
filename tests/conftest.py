@@ -16,7 +16,7 @@ from forecast_blend.weights import ALL_MODEL_NAMES
 @time_machine.travel("2023-01-01 00:00:01")
 def forecasts(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
-    # time detal of 2 days is used as fake forecast are made 2 days in the past,
+    # time delay of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
     for model_name in ALL_MODEL_NAMES:
@@ -34,7 +34,6 @@ def forecasts(db_session):
             t0_datetime_utc=t0_datetime_utc,
         )
         
-
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
 
@@ -42,7 +41,7 @@ def forecasts(db_session):
 @time_machine.travel("2023-01-01 00:00:00")
 def forecast_national(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
-    # time detal of 2 days is used as fake forecast are made 2 days in the past,
+    # time delay of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
     for model_name in ALL_MODEL_NAMES:
@@ -64,9 +63,6 @@ def forecast_national(db_session):
 @time_machine.travel("2023-01-01 00:00:00")
 def forecast_national_ecmwf_and_xg(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc)
-    # time detal of 2 days is used as fake forecast are made 2 days in the past,
-    # this makes them for now
-    # create
     model_names_ecmwf_and_xg = ["pvnet_ecmwf", "National_xg"]
     for i, model_name in enumerate(model_names_ecmwf_and_xg):
 
@@ -85,6 +81,25 @@ def forecast_national_ecmwf_and_xg(db_session):
 
         save(forecasts=forecasts, session=db_session, apply_adjuster=False)
 
+
+@pytest.fixture
+@time_machine.travel("2023-01-01 00:00:00")
+def forecast_national_all_now(db_session):
+    t0_datetime_utc = datetime.now(tz=timezone.utc)
+    
+    for model_name in ALL_MODEL_NAMES:
+
+        gsp_ids = [0]
+
+        f = make_fake_forecasts(
+            gsp_ids=gsp_ids,
+            session=db_session,
+            model_name=model_name,
+            n_fake_forecasts=16,
+            t0_datetime_utc=t0_datetime_utc,
+        )
+
+        save(forecasts=f, session=db_session, apply_adjuster=False)
 
 
 # This is a bit complicated and sensitive to change

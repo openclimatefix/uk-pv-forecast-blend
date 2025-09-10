@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 import time_machine
 from weights import (
@@ -69,3 +70,21 @@ def test_get_regional_blend_weights(forecast_national_ecmwf_and_xg, db_session):
 
     assert (weights_df.values==1).all()
 
+# Test with and without excluding the pvnet_cloud model
+test_settings = [(None, "pvnet_cloud"),  (["pvnet_cloud"], "pvnet_v2")]
+@time_machine.travel("2023-01-01 00:00:01")
+@pytest.mark.parametrize("exclude_models, intraday_model", test_settings)
+def test_get_regional_blend_weights_cloud(forecast_national_all_now, db_session, exclude_models, intraday_model):
+    t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
+
+    weights_df = get_regional_blend_weights(session=db_session, t0=t0, exclude_models=exclude_models)
+    
+    # Check the expected models have been returned
+    assert set(weights_df.columns)==set([intraday_model, "pvnet_day_ahead"])
+
+    # intraday_model should be used for the first 16 time steps then not available
+    assert (weights_df[intraday_model][:16].values>0).all()
+    assert np.isnan(weights_df[intraday_model][16:]).all()
+
+    # pvnet_day_ahead should be used for all timesteps after 16
+    assert (weights_df["pvnet_day_ahead"][16:].values==1).all()

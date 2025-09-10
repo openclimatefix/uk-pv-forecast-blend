@@ -37,7 +37,6 @@ def forecasts(db_session):
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
-    return None
 
 @pytest.fixture
 @time_machine.travel("2023-01-01 00:00:00")
@@ -60,7 +59,6 @@ def forecast_national(db_session):
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
-    return None
 
 @pytest.fixture
 @time_machine.travel("2023-01-01 00:00:00")
@@ -87,15 +85,10 @@ def forecast_national_ecmwf_and_xg(db_session):
 
         save(forecasts=forecasts, session=db_session, apply_adjuster=False)
 
-    return None
 
 
-"""
-This is a bit complicated and sensitive to change
-https://gist.github.com/kissgyorgy/e2365f25a213de44b9a2 helped me get going
-"""
-
-
+# This is a bit complicated and sensitive to change
+# https://gist.github.com/kissgyorgy/e2365f25a213de44b9a2 helped me get going
 @pytest.fixture(scope="session")
 def engine_url():
     """Database engine, this includes the table creation."""
@@ -124,7 +117,7 @@ def engine_url():
 def db_connection(engine_url):
     database_connection = DatabaseConnection(engine_url, echo=False)
 
-    engine = database_connection.engine
+    # engine = database_connection.engine
     # connection = engine.connect()
     # transaction = connection.begin()
 

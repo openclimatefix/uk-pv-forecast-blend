@@ -34,9 +34,9 @@ def test_app(db_session, forecasts):
 
     # Check the number forecasts have been made
     # (10 GSPs + 1 National) = 11 forecasts
-    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
-    # 11 + 11 + 11 + 1 = 34
-    N = 34
+    # This is for pvnet_v2, pvnet_day_ahead, pvnet_ecmwf, pvnet_cloud, and National-xg (which is only National)
+    # 11 + 11 + 11 + 11 + 1 = 45
+    N = 45
     # Doubled for historic and forecast
     assert len(db_session.query(ForecastSQL).all()) == N * 2
     assert len(db_session.query(LocationSQL).all()) == 11
@@ -58,9 +58,9 @@ def test_app_twice(db_session, forecasts):
 
     # Check the number forecasts have been made
     # (10 GSPs + 1 National) = 11 forecasts
-    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
-    # 11 + 11 + 11 +1 = 34
-    N = 34
+    # This is for pvnet_v2, pvnet_day_ahead, pvnet_ecmwf, pvnet_cloud, and National-xg (which is only National)
+    # 11 + 11 + 11 + 11 + 1 = 45
+    N = 45
     # Doubled for historic and forecast
     assert len(db_session.query(ForecastSQL).all()) == 2 * N
     assert len(db_session.query(LocationSQL).all()) == 11
@@ -90,9 +90,8 @@ def test_app_only_national(db_session, forecast_national):
 
     # Check the number forecasts have been made
     # 1 National)
-    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
-    # 4
-    N = 4
+    # This is for pvnet_v2, pvnet_day_ahead, pvnet_ecmwf, pvnet_cloud, and National-xg
+    N = 5
     # Doubled for historic and forecast
     assert len(db_session.query(ForecastSQL).all()) == 2*N
     assert len(db_session.query(LocationSQL).all()) == 1
@@ -137,12 +136,7 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
 
     expected_values = pd.Series(
         [0]*15+[0.25, 0.5, 0.75]+[1]*7,
-        index=pd.date_range(
-            "2022-12-31 23:30",
-            "2023-01-01 11:30",
-            freq="30min",
-            tz="UTC",
-        ),
+        index=pd.date_range("2022-12-31 23:30", "2023-01-01 11:30", freq="30min", tz="UTC"),
     )
 
     for i, fv in enumerate(fvs):

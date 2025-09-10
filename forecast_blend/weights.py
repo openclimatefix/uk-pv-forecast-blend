@@ -348,13 +348,13 @@ def get_national_blend_weights(
     df_mae = get_horizon_maes()
 
     if exclude_models is None:
-        model_names = [*ALL_MODEL_NAMES]
+        all_model_names = [*ALL_MODEL_NAMES]
     else:
-        model_names = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
+        all_model_names = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
         df_mae = df_mae.drop(columns=exclude_models)
     
     # We need to have MAE-horizon values for all potential models
-    assert len(set(model_names) - set(df_mae.columns))==0
+    assert len(set(all_model_names) - set(df_mae.columns))==0
     
     # The maximum forecast horizon of any of the models
     max_horizon = df_mae.index.max()
@@ -362,7 +362,7 @@ def get_national_blend_weights(
     # Find how delayed the most recent forecast of each model is
     df_latest_forecast_ids = get_latest_forecast_metadata(
         session=session, 
-        model_names=model_names, 
+        model_names=all_model_names, 
         t0=t0, 
         max_delay=max_horizon,
     )
@@ -371,28 +371,28 @@ def get_national_blend_weights(
     # If the model has not run recently it will not appear in the recent forecasts in the database. 
     # Therefore it will not appear in model_delays_dict. Add it with a delay of the maximum forecast 
     # horizon so it will be present, but disregarded in further steps
-    model_delays_dict = {m: model_delays_dict.get(m, max_horizon) for m in model_names}
+    model_delays_dict = {m: model_delays_dict.get(m, max_horizon) for m in all_model_names}
 
     # Construct the expected horizon-MAE values for each model run with the current delays
     df_delayed_mae = delay_horizon_maes(df_mae, model_delays_dict)
     
     # Calculate the optimal blend weights between day-ahead models
     df_da_model_weights = calculate_optimal_blend_weights(
-        df_delayed_mae[DAY_AHEAD_MODEL_NAMES], 
+        df_delayed_mae[all_model_names], 
         backup_model_name="National_xg", 
         kernel=BLEND_KERNEL, 
         score_func=make_avg_mae_func(36),
     )
     
     # Calculate the expected horizon-MAE for the day-ahead blend computed above
-    mask = ~df_delayed_mae[DAY_AHEAD_MODEL_NAMES].isnull().all(axis=1)
+    mask = ~df_delayed_mae[all_model_names].isnull().all(axis=1)
     df_delayed_mae["da_blend"] = (
         df_da_model_weights.fillna(0)*df_delayed_mae[DAY_AHEAD_MODEL_NAMES]
     ).sum(skipna=True, axis=1).where(mask)
     
     # Calculate the optimal blend weights for blending the intraday models into the day-ahead blend
     df_intraday_model_weights = calculate_optimal_blend_weights(
-        df_delayed_mae[INTRADAY_MODEL_NAMES+["da_blend"]], 
+        df_delayed_mae[all_model_names+["da_blend"]], 
         backup_model_name="da_blend",
         kernel=BLEND_KERNEL,
         score_func=make_avg_mae_func(8),

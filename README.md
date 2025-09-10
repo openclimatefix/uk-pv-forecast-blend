@@ -55,7 +55,7 @@ into National_XG if needed - but this should rarely be the case
 - `DB_URL`: The database url you want to save the results to
 - `N_GSP`: The number of gsps you want to pull. N_GSP=1 means only National is run. 
 - `BLEND_NAME`: The model name to save the blend under. Defaults to `"blend"`.
-- `ALLOW_CLOUDCASTING`: Whether to allow `"pvnet_cloud"` to be part of the blend.
+- `ALLOW_CLOUDCASTING`: Whether to allow `"pvnet_cloud"` to be part of the blend. Defaults to False
 
 # Tests
 

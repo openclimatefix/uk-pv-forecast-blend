@@ -3,7 +3,7 @@ import pandas as pd
 
 import time_machine
 from weights import (
-    get_national_blend_weights, get_regional_blend_weights, get_horizon_maes, model_names
+    get_national_blend_weights, get_regional_blend_weights, get_horizon_maes, ALL_MODEL_NAMES
 )
 
 
@@ -12,7 +12,7 @@ def test_get_horizon_maes():
     df = get_horizon_maes()
     
     # Check all the expected models are present
-    assert set(model_names) - set(df.columns) == set()
+    assert set(ALL_MODEL_NAMES) - set(df.columns) == set()
 
 
 @time_machine.travel("2023-01-01 00:00:01")

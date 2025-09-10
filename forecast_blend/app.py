@@ -35,7 +35,7 @@ from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 from blend import get_blend_forecast_values_latest
 from utils import get_start_datetime
 from weights import (
-    MODEL_NAMES,
+    ALL_MODEL_NAMES,
     backfill_weights, 
     get_national_blend_weights, 
     get_regional_blend_weights,
@@ -161,7 +161,7 @@ def get_blend_model(session: Session, blend_name: str = "blend") -> MLModelSQL:
 
     # get all model versions
     models = {}
-    for model_name in MODEL_NAMES:
+    for model_name in ALL_MODEL_NAMES:
         model = get_model(name=model_name, session=session)
         models[model_name] = model.version
 

@@ -1,5 +1,6 @@
 import pandas as pd
 import time_machine
+import os
 
 from nowcasting_datamodel.models import LocationSQL
 from nowcasting_datamodel.models.forecast import (
@@ -16,17 +17,17 @@ from app import app, is_last_forecast_made_before_last_30_minutes_step
 @time_machine.travel("2023-01-01 00:00:01")
 def test_is_last_forecast_longer_30_minutes(db_session):
 
-    assert is_last_forecast_made_before_last_30_minutes_step(db_session)
+    assert is_last_forecast_made_before_last_30_minutes_step(db_session, blend_name=os.environ["BLEND_NAME"])
 
 
 @time_machine.travel("2023-01-01 00:00:01")
 def test_is_last_forecast_longer_30_minutes_dont_create(db_session, forecasts):
 
-    # make sure model is "blend"
+    # make sure model is the blend
     f = db_session.query(ForecastSQL).all()
-    f[0].model.name = "blend"
+    f[0].model.name = os.environ["BLEND_NAME"]
 
-    assert not is_last_forecast_made_before_last_30_minutes_step(db_session)
+    assert not is_last_forecast_made_before_last_30_minutes_step(db_session, blend_name=os.environ["BLEND_NAME"])
 
 
 @time_machine.travel("2023-01-01 00:00:01")
@@ -128,7 +129,7 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
     app(gsps=[0])
 
     # get all the blended forecast values latest
-    models = db_session.query(MLModelSQL).where(MLModelSQL.name == 'blend').all()
+    models = db_session.query(MLModelSQL).where(MLModelSQL.name == os.environ["BLEND_NAME"]).all()
     assert len(models) == 1
     fvs = db_session.query(ForecastValueLatestSQL).where(ForecastValueLatestSQL.model_id == models[0].id).all()
 

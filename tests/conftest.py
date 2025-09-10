@@ -11,6 +11,9 @@ from nowcasting_datamodel.save.save import save
 
 from forecast_blend.weights import ALL_MODEL_NAMES
 
+# Arbitrarily set the blend name so we can test it is properly set throughout tests
+os.environ["BLEND_NAME"] = "test_blend_name"
+
 
 @pytest.fixture
 @time_machine.travel("2023-01-01 00:00:01")
@@ -86,7 +89,7 @@ def forecast_national_ecmwf_and_xg(db_session):
 @time_machine.travel("2023-01-01 00:00:00")
 def forecast_national_all_now(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc)
-    
+
     for model_name in ALL_MODEL_NAMES:
 
         gsp_ids = [0]

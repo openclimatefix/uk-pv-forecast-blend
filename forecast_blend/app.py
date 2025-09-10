@@ -72,7 +72,7 @@ def app(gsps: list[int] | None = None) -> None:
         gsps = range(0, n_gsps + 1)
 
     # make connection to database
-    connection = DatabaseConnection(url=os.getenv("DB_URL", "not_set"), echo=False)
+    connection = DatabaseConnection(url=os.environ["DB_URL"], echo=False)
 
     start_datetime = get_start_datetime()
     t0 = pd.Timestamp.utcnow().floor("30min")
@@ -130,7 +130,7 @@ def app(gsps: list[int] | None = None) -> None:
         # tables, as we will end up doubling the size of this table.
         assert len(forecasts) > 0, "No forecasts made"
         assert len(forecasts[0].forecast_values) > 0, "No forecast values sql made"
-        if is_last_forecast_made_before_last_30_minutes_step(session=session, blend_name = blend_name):
+        if is_last_forecast_made_before_last_30_minutes_step(session=session, blend_name=blend_name):
             logger.debug(f"Saving {len(forecasts)} forecasts")
             save(
                 session=session,

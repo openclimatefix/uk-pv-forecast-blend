@@ -35,7 +35,7 @@ from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 from blend import get_blend_forecast_values_latest
 from utils import get_start_datetime
 from weights import (
-    model_names,
+    ALL_MODEL_NAMES,
     backfill_weights, 
     get_national_blend_weights, 
     get_regional_blend_weights,
@@ -60,6 +60,11 @@ logger.add(sys.stderr, level=os.getenv("LOG_LEVEL", "INFO"))
 def app(gsps: list[int] | None = None) -> None:
     """run main app"""
 
+    blend_name = os.getenv("BLEND_NAME", "blend")
+    allow_cloudcasting = os.getenv("ALLOW_CLOUDCASTING", "false").lower()=="true"
+
+    exclude_models = None if allow_cloudcasting else ["pvnet_cloud"]
+
     if gsps is None:
         n_gsps = int(os.getenv("N_GSP", N_GSP))
         n_gsps = min([n_gsps, N_GSP])
@@ -67,18 +72,17 @@ def app(gsps: list[int] | None = None) -> None:
         gsps = range(0, n_gsps + 1)
 
     # make connection to database
-    connection = DatabaseConnection(url=os.getenv("DB_URL", "not_set"), echo=False)
+    connection = DatabaseConnection(url=os.environ["DB_URL"], echo=False)
 
     start_datetime = get_start_datetime()
     t0 = pd.Timestamp.utcnow().floor("30min")
 
-
     with connection.get_session() as session:
 
-        model = get_blend_model(session)
+        model = get_blend_model(session, blend_name)
 
-        national_weights_df = get_national_blend_weights(session, t0)
-        regional_weights_df = get_regional_blend_weights(session, t0)
+        national_weights_df = get_national_blend_weights(session, t0, exclude_models)
+        regional_weights_df = get_regional_blend_weights(session, t0, exclude_models)
 
         national_weights_df = backfill_weights(national_weights_df, start_datetime)
         regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
@@ -126,7 +130,7 @@ def app(gsps: list[int] | None = None) -> None:
         # tables, as we will end up doubling the size of this table.
         assert len(forecasts) > 0, "No forecasts made"
         assert len(forecasts[0].forecast_values) > 0, "No forecast values sql made"
-        if is_last_forecast_made_before_last_30_minutes_step(session=session):
+        if is_last_forecast_made_before_last_30_minutes_step(session=session, blend_name=blend_name):
             logger.debug(f"Saving {len(forecasts)} forecasts")
             save(
                 session=session,
@@ -148,24 +152,25 @@ def app(gsps: list[int] | None = None) -> None:
     logger.info("Finished")
 
 
-def get_blend_model(session: Session) -> MLModelSQL:
+def get_blend_model(session: Session, blend_name: str = "blend") -> MLModelSQL:
     """Get the blend model
 
     The version is made up of all the models version for example
     version = {"cnn": "0.0.1", "National_xg": "0.0.1", "pvnet_v2": "0.0.1", "blend": "0.0.1"}
     """
+
     # get all model versions
     models = {}
-    for model_name in model_names:
+    for model_name in ALL_MODEL_NAMES:
         model = get_model(name=model_name, session=session)
         models[model_name] = model.version
 
     # add blend version
-    models["blend"] = __version__
+    models[blend_name] = __version__
     all_version = json.dumps(models)
 
     # get model object from database
-    return get_model(name="blend", version=all_version, session=session)
+    return get_model(name=blend_name, version=all_version, session=session)
 
 
 def make_forecast(
@@ -204,7 +209,7 @@ def make_forecast(
     )
 
 
-def is_last_forecast_made_before_last_30_minutes_step(session: Session):
+def is_last_forecast_made_before_last_30_minutes_step(session: Session, blend_name: str = "blend"):
     """
     Save the forecast to the database every 30 minutes
 
@@ -216,7 +221,7 @@ def is_last_forecast_made_before_last_30_minutes_step(session: Session):
 
     query = session.query(ForecastSQL)
     query = query.join(MLModelSQL)
-    query = query.filter(MLModelSQL.name == "blend")
+    query = query.filter(MLModelSQL.name == blend_name)
     query = query.filter(ForecastSQL.historic == False)
     query = query.filter(ForecastSQL.created_utc > one_week_ago)
     query = query.order_by(ForecastSQL.forecast_creation_time.desc())

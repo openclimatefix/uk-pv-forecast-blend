@@ -9,13 +9,12 @@ from loguru import logger
 
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
-import structlog
 
 
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]
-INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_ecmwf"]
-model_names = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
+INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_ecmwf", "pvnet_cloud"]
+ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
 
 BLEND_KERNEL = [0.75, 0.5, 0.25]
 MIN_FORECAST_HORIZON = pd.Timedelta("30min")
@@ -315,7 +314,11 @@ def calculate_optimal_blend_weights(
     return pd.DataFrame(blend_results, index=df_mae.index)
 
 
-def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFrame:
+def get_national_blend_weights(
+    session: Session, 
+    t0: pd.Timestamp, 
+    exclude_models: list[str] | None = None,
+) -> pd.DataFrame:
     """Determines optimal time-varying weights for blending multiple forecast models.
 
     This function calculates weights for combining various day-ahead and intraday models based
@@ -327,6 +330,7 @@ def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     Args:
         session: The database session
         t0: The forecast initialisation time
+        exclude_models: These models will not be included in the blend
 
     Returns:
         A pandas DataFrame containing the optimal blend weights:
@@ -342,9 +346,15 @@ def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     """
     
     df_mae = get_horizon_maes()
+
+    if exclude_models is None:
+        all_model_names = [*ALL_MODEL_NAMES]
+    else:
+        all_model_names = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
+        df_mae = df_mae.drop(columns=exclude_models)
     
     # We need to have MAE-horizon values for all potential models
-    assert len(set(model_names) - set(df_mae.columns))==0
+    assert len(set(all_model_names) - set(df_mae.columns))==0
     
     # The maximum forecast horizon of any of the models
     max_horizon = df_mae.index.max()
@@ -352,7 +362,7 @@ def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     # Find how delayed the most recent forecast of each model is
     df_latest_forecast_ids = get_latest_forecast_metadata(
         session=session, 
-        model_names=model_names, 
+        model_names=all_model_names, 
         t0=t0, 
         max_delay=max_horizon,
     )
@@ -361,28 +371,28 @@ def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     # If the model has not run recently it will not appear in the recent forecasts in the database. 
     # Therefore it will not appear in model_delays_dict. Add it with a delay of the maximum forecast 
     # horizon so it will be present, but disregarded in further steps
-    model_delays_dict = {m: model_delays_dict.get(m, max_horizon) for m in model_names}
+    model_delays_dict = {m: model_delays_dict.get(m, max_horizon) for m in all_model_names}
 
     # Construct the expected horizon-MAE values for each model run with the current delays
     df_delayed_mae = delay_horizon_maes(df_mae, model_delays_dict)
     
     # Calculate the optimal blend weights between day-ahead models
     df_da_model_weights = calculate_optimal_blend_weights(
-        df_delayed_mae[DAY_AHEAD_MODEL_NAMES], 
+        df_delayed_mae[all_model_names], 
         backup_model_name="National_xg", 
         kernel=BLEND_KERNEL, 
         score_func=make_avg_mae_func(36),
     )
     
     # Calculate the expected horizon-MAE for the day-ahead blend computed above
-    mask = ~df_delayed_mae[DAY_AHEAD_MODEL_NAMES].isnull().all(axis=1)
+    mask = ~df_delayed_mae[all_model_names].isnull().all(axis=1)
     df_delayed_mae["da_blend"] = (
         df_da_model_weights.fillna(0)*df_delayed_mae[DAY_AHEAD_MODEL_NAMES]
     ).sum(skipna=True, axis=1).where(mask)
     
     # Calculate the optimal blend weights for blending the intraday models into the day-ahead blend
     df_intraday_model_weights = calculate_optimal_blend_weights(
-        df_delayed_mae[INTRADAY_MODEL_NAMES+["da_blend"]], 
+        df_delayed_mae[all_model_names+["da_blend"]], 
         backup_model_name="da_blend",
         kernel=BLEND_KERNEL,
         score_func=make_avg_mae_func(8),
@@ -406,7 +416,11 @@ def get_national_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     return df_all_weights
 
 
-def get_regional_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFrame:
+def get_regional_blend_weights(
+    session: Session, 
+    t0: pd.Timestamp, 
+    exclude_models: list[str] = None,
+) -> pd.DataFrame:
     """Determines optimal time-varying weights for blending multiple forecast models.
 
     This function calculates weights for combining various day-ahead and intraday models based
@@ -417,6 +431,7 @@ def get_regional_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
     Args:
         session: The database session
         t0: The forecast initialisation time
+        exclude_models: These models will not be included in the blend
 
     Returns:
         A pandas DataFrame containing the optimal blend weights:
@@ -431,10 +446,16 @@ def get_regional_blend_weights(session: Session, t0: pd.Timestamp) -> pd.DataFra
           MAE data will not appear as columns or will have zero/NaN weights.
     """
 
-    df_mae = get_horizon_maes().drop(columns="National_xg")
+    # National_xg is not a regional model
+    if exclude_models is None:
+        exclude_models = ["National_xg"]
+    else:
+        exclude_models = exclude_models + ["National_xg"]
+
+    df_mae = get_horizon_maes().drop(columns=exclude_models)
 
     # We need to have MAE-horizon values for all potential models
-    all_regional_models = [m for m in model_names if m!="National_xg"]
+    all_regional_models = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
     assert len(set(all_regional_models) - set(df_mae.columns))==0
     
     # The maximum forecast horizon of any of the models

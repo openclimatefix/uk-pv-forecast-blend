@@ -9,17 +9,20 @@ from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts
 from nowcasting_datamodel.save.save import save
 
-from forecast_blend.weights import model_names
+from forecast_blend.weights import ALL_MODEL_NAMES
+
+# Arbitrarily set the blend name so we can test it is properly set throughout tests
+os.environ["BLEND_NAME"] = "test_blend_name"
 
 
 @pytest.fixture
 @time_machine.travel("2023-01-01 00:00:01")
 def forecasts(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
-    # time detal of 2 days is used as fake forecast are made 2 days in the past,
+    # time delay of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
-    for model_name in model_names:
+    for model_name in ALL_MODEL_NAMES:
 
         if model_name == "National_xg":
             gsp_ids = [0]
@@ -34,19 +37,17 @@ def forecasts(db_session):
             t0_datetime_utc=t0_datetime_utc,
         )
         
-
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
-    return None
 
 @pytest.fixture
 @time_machine.travel("2023-01-01 00:00:00")
 def forecast_national(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc) + timedelta(days=2)
-    # time detal of 2 days is used as fake forecast are made 2 days in the past,
+    # time delay of 2 days is used as fake forecast are made 2 days in the past,
     # this makes them for now
     # create
-    for model_name in model_names:
+    for model_name in ALL_MODEL_NAMES:
 
         gsp_ids = [0]
 
@@ -60,15 +61,11 @@ def forecast_national(db_session):
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
-    return None
 
 @pytest.fixture
 @time_machine.travel("2023-01-01 00:00:00")
 def forecast_national_ecmwf_and_xg(db_session):
     t0_datetime_utc = datetime.now(tz=timezone.utc)
-    # time detal of 2 days is used as fake forecast are made 2 days in the past,
-    # this makes them for now
-    # create
     model_names_ecmwf_and_xg = ["pvnet_ecmwf", "National_xg"]
     for i, model_name in enumerate(model_names_ecmwf_and_xg):
 
@@ -87,15 +84,29 @@ def forecast_national_ecmwf_and_xg(db_session):
 
         save(forecasts=forecasts, session=db_session, apply_adjuster=False)
 
-    return None
+
+@pytest.fixture
+@time_machine.travel("2023-01-01 00:00:00")
+def forecast_national_all_now(db_session):
+    t0_datetime_utc = datetime.now(tz=timezone.utc)
+
+    for model_name in ALL_MODEL_NAMES:
+
+        gsp_ids = [0]
+
+        f = make_fake_forecasts(
+            gsp_ids=gsp_ids,
+            session=db_session,
+            model_name=model_name,
+            n_fake_forecasts=16,
+            t0_datetime_utc=t0_datetime_utc,
+        )
+
+        save(forecasts=f, session=db_session, apply_adjuster=False)
 
 
-"""
-This is a bit complicated and sensitive to change
-https://gist.github.com/kissgyorgy/e2365f25a213de44b9a2 helped me get going
-"""
-
-
+# This is a bit complicated and sensitive to change
+# https://gist.github.com/kissgyorgy/e2365f25a213de44b9a2 helped me get going
 @pytest.fixture(scope="session")
 def engine_url():
     """Database engine, this includes the table creation."""
@@ -124,7 +135,7 @@ def engine_url():
 def db_connection(engine_url):
     database_connection = DatabaseConnection(engine_url, echo=False)
 
-    engine = database_connection.engine
+    # engine = database_connection.engine
     # connection = engine.connect()
     # transaction = connection.begin()
 

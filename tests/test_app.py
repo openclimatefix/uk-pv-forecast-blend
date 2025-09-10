@@ -1,5 +1,6 @@
 import pandas as pd
 import time_machine
+import os
 
 from nowcasting_datamodel.models import LocationSQL
 from nowcasting_datamodel.models.forecast import (
@@ -16,17 +17,17 @@ from app import app, is_last_forecast_made_before_last_30_minutes_step
 @time_machine.travel("2023-01-01 00:00:01")
 def test_is_last_forecast_longer_30_minutes(db_session):
 
-    assert is_last_forecast_made_before_last_30_minutes_step(db_session)
+    assert is_last_forecast_made_before_last_30_minutes_step(db_session, blend_name=os.environ["BLEND_NAME"])
 
 
 @time_machine.travel("2023-01-01 00:00:01")
 def test_is_last_forecast_longer_30_minutes_dont_create(db_session, forecasts):
 
-    # make sure model is "blend"
+    # make sure model is the blend
     f = db_session.query(ForecastSQL).all()
-    f[0].model.name = "blend"
+    f[0].model.name = os.environ["BLEND_NAME"]
 
-    assert not is_last_forecast_made_before_last_30_minutes_step(db_session)
+    assert not is_last_forecast_made_before_last_30_minutes_step(db_session, blend_name=os.environ["BLEND_NAME"])
 
 
 @time_machine.travel("2023-01-01 00:00:01")
@@ -34,9 +35,9 @@ def test_app(db_session, forecasts):
 
     # Check the number forecasts have been made
     # (10 GSPs + 1 National) = 11 forecasts
-    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
-    # 11 + 11 + 11 + 1 = 34
-    N = 34
+    # This is for pvnet_v2, pvnet_day_ahead, pvnet_ecmwf, pvnet_cloud, and National-xg (which is only National)
+    # 11 + 11 + 11 + 11 + 1 = 45
+    N = 45
     # Doubled for historic and forecast
     assert len(db_session.query(ForecastSQL).all()) == N * 2
     assert len(db_session.query(LocationSQL).all()) == 11
@@ -58,9 +59,9 @@ def test_app_twice(db_session, forecasts):
 
     # Check the number forecasts have been made
     # (10 GSPs + 1 National) = 11 forecasts
-    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
-    # 11 + 11 + 11 +1 = 34
-    N = 34
+    # This is for pvnet_v2, pvnet_day_ahead, pvnet_ecmwf, pvnet_cloud, and National-xg (which is only National)
+    # 11 + 11 + 11 + 11 + 1 = 45
+    N = 45
     # Doubled for historic and forecast
     assert len(db_session.query(ForecastSQL).all()) == 2 * N
     assert len(db_session.query(LocationSQL).all()) == 11
@@ -89,10 +90,9 @@ def test_app_twice(db_session, forecasts):
 def test_app_only_national(db_session, forecast_national):
 
     # Check the number forecasts have been made
-    # 1 National)
-    # This is for PVnet and PVnet DA, PVNet ECMWF, National-xg (which is only National)
-    # 4
-    N = 4
+    # 1 National
+    # This is for pvnet_v2, pvnet_day_ahead, pvnet_ecmwf, pvnet_cloud, and National-xg
+    N = 5
     # Doubled for historic and forecast
     assert len(db_session.query(ForecastSQL).all()) == 2*N
     assert len(db_session.query(LocationSQL).all()) == 1
@@ -129,7 +129,7 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
     app(gsps=[0])
 
     # get all the blended forecast values latest
-    models = db_session.query(MLModelSQL).where(MLModelSQL.name == 'blend').all()
+    models = db_session.query(MLModelSQL).where(MLModelSQL.name == os.environ["BLEND_NAME"]).all()
     assert len(models) == 1
     fvs = db_session.query(ForecastValueLatestSQL).where(ForecastValueLatestSQL.model_id == models[0].id).all()
 
@@ -137,12 +137,7 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
 
     expected_values = pd.Series(
         [0]*15+[0.25, 0.5, 0.75]+[1]*7,
-        index=pd.date_range(
-            "2022-12-31 23:30",
-            "2023-01-01 11:30",
-            freq="30min",
-            tz="UTC",
-        ),
+        index=pd.date_range("2022-12-31 23:30", "2023-01-01 11:30", freq="30min", tz="UTC"),
     )
 
     for i, fv in enumerate(fvs):

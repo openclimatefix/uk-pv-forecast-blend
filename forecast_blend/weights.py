@@ -330,7 +330,7 @@ def get_national_blend_weights(
     Args:
         session: The database session
         t0: The forecast initialisation time
-        exclude_models: These models will not be excluded from the blend
+        exclude_models: These models will not be included in the blend
 
     Returns:
         A pandas DataFrame containing the optimal blend weights:

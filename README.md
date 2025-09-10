@@ -15,10 +15,10 @@ but we only update the ForecastValue table every 30 minutes
 
 # Details
 
-- Note we only blend forecasts if they are made within 6 hours. 
-If all forecasts are older than this, then all forecasts are used.
-- The probabilistic forecasts are now blended using the same method as the expected value
-- We current take `Pvnet`, then blend it with `PVnet DA`. `PVnet ECMWF` is used as a backup, and final `National-xg` is a final backup. 
+The blend is created by choosing the intraday model with the lowest expected MAE (whilst also 
+considering the delay to each model run). This intraday model is blended into PVNet-DA unless 
+PVNet-DA has a lower expect MAE in which case no intraday model is selected. This is then blended 
+into National_XG if needed - but this should rarely be the case
 
 ```mermaid
   graph TD;

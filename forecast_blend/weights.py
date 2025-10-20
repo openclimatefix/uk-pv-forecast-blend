@@ -76,6 +76,9 @@ def get_latest_forecast_metadata(
         .order_by(ForecastSQL.location_id, MLModelSQL.name, ForecastSQL.forecast_creation_time.desc())
     )
 
+    engine = session.get_bind()
+    logger.info(f"{engine.url=}")
+
     return pd.read_sql(query.statement, session.bind)
 
 

@@ -10,7 +10,7 @@ from loguru import logger
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 
-from _sqlite3 import *  # noqa
+from sqlite3 import *  # noqa
 
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]

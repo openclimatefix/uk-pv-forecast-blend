@@ -15,7 +15,7 @@ from nowcasting_datamodel.read.read import get_forecast_values_latest
 
 from sqlalchemy.orm.session import Session
 
-from utils import (
+from forecast_blend.utils import (
     blend_forecasts_together,
     check_forecast_created_utc,
     convert_df_to_list_forecast_values,

@@ -76,7 +76,15 @@ def get_latest_forecast_metadata(
         .order_by(ForecastSQL.location_id, MLModelSQL.name, ForecastSQL.forecast_creation_time.desc())
     )
 
-    return pd.read_sql(query.statement, query.session.bind)
+    data = query.all()
+
+    pd.read_sql
+
+    # convert to DataFrame
+    df = pd.DataFrame(data, columns=[str(col.name) for col in forecast_columns])
+    df["forecast_creation_time"] = pd.to_datetime(df["forecast_creation_time"])
+    df["created_utc"] = pd.to_datetime(df["created_utc"])
+    return df
 
 
 def _get_most_recent_row(df: pd.DataFrame) -> pd.Series:

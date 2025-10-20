@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 import time_machine
-from weights import (
+from forecast_blend.weights import (
     get_national_blend_weights, get_regional_blend_weights, get_horizon_maes, ALL_MODEL_NAMES
 )
 

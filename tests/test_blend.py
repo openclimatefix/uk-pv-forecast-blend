@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 import pandas as pd
-from blend import get_blend_forecast_values_latest
+from forecast_blend.blend import get_blend_forecast_values_latest
 import time_machine
 from nowcasting_datamodel.fake import make_fake_forecasts
 from nowcasting_datamodel.models.forecast import ForecastValueLatestSQL

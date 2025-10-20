@@ -78,6 +78,8 @@ def get_latest_forecast_metadata(
 
     data = query.all()
 
+    pd.read_sql
+
     # convert to DataFrame
     df = pd.DataFrame(data, columns=[str(col.name) for col in forecast_columns])
     df["forecast_creation_time"] = pd.to_datetime(df["forecast_creation_time"])

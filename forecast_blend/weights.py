@@ -76,6 +76,7 @@ def get_latest_forecast_metadata(
         .order_by(ForecastSQL.location_id, MLModelSQL.name, ForecastSQL.forecast_creation_time.desc())
     )
 
+    from _sqlite3 import *
     engine = session.get_bind()
     logger.info(f"{engine.url=}")
 

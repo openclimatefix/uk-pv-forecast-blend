@@ -113,7 +113,7 @@ def add_p_levels_to_forecast_values(
     :return: DataFrame of blended forecast values with added properties
     """
 
-    logger.debug(f"Adding properties to blended forecast values")
+    logger.debug("Adding properties to blended forecast values")
     all_model_df.reset_index(inplace=True, drop=True)
 
     # get properties out of json if they exist

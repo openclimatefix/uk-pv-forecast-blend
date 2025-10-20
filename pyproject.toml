@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "uk-pv-forecast-blend"
 description = "App for blending PV forecasts"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.12,<3.13"
 license = {text = "MIT License"}
 authors = [
     {name = "Open Climate Fix", email = "info@openclimatefix.org"},
@@ -20,6 +20,7 @@ dependencies = [
     "sentry-sdk==2.13.0",
     "testcontainers>=3.5.0",
     "loguru==0.7.3",
+    "ruff",
 ]
 dynamic = ["version"]
 
@@ -38,7 +39,7 @@ package-dir = {"" = "forecast_blend"}
 [tool.setuptools-git-versioning]
 enabled = true
 template = "{tag}"
-dirty_template = "{tag}.dirty"
+dirty_template = "{tag}"
 
 # --- TESTING CONFIGURATION --- #
 

@@ -76,7 +76,7 @@ def get_latest_forecast_metadata(
         .order_by(ForecastSQL.location_id, MLModelSQL.name, ForecastSQL.forecast_creation_time.desc())
     )
 
-    return pd.read_sql(query.statement, query.session.bind)
+    return pd.read_sql(query.statement, session.bind)
 
 
 def _get_most_recent_row(df: pd.DataFrame) -> pd.Series:

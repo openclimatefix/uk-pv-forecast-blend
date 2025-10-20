@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y git
 # Project configuration
 WORKDIR /app
 COPY pyproject.toml /app/pyproject.toml
+COPY README.md /app/README.md
 
 # UV settings
 ENV UV_COMPILE_BYTECODE=1 \

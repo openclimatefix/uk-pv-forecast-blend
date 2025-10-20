@@ -35,9 +35,6 @@ dev = [
 [project.urls]
 repository = "https://github.com/openclimatefix/uk-pv-forecast-blend"
 
-[tool.setuptools]
-package-dir = {"" = "forecast_blend"}
-
 [tool.setuptools-git-versioning]
 enabled = true
 template = "{tag}"

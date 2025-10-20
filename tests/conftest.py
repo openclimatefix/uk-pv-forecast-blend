@@ -110,7 +110,7 @@ def forecast_national_all_now(db_session):
 @pytest.fixture(scope="session")
 def engine_url():
     """Database engine, this includes the table creation."""
-    with PostgresContainer("postgres:14.5") as postgres:
+    with PostgresContainer("postgres:17.6") as postgres:
         url = postgres.get_connection_url()
         os.environ["DB_URL"] = url
 

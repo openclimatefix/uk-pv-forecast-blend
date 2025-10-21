@@ -10,8 +10,6 @@ from loguru import logger
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 
-from sqlite3 import *  # noqa
-
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]
 INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_ecmwf", "pvnet_cloud"]
@@ -76,9 +74,6 @@ def get_latest_forecast_metadata(
         .filter(MLModelSQL.name.in_(model_names))
         .order_by(ForecastSQL.location_id, MLModelSQL.name, ForecastSQL.forecast_creation_time.desc())
     )
-
-    engine = session.get_bind()
-    logger.info(f"{engine.url=}")
 
     return pd.read_sql(query.statement, session.bind)
 

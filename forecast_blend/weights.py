@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 
 
-
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]
 INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_ecmwf", "pvnet_cloud"]
 ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
@@ -76,15 +75,8 @@ def get_latest_forecast_metadata(
         .order_by(ForecastSQL.location_id, MLModelSQL.name, ForecastSQL.forecast_creation_time.desc())
     )
 
-    data = query.all()
+    return pd.read_sql(query.statement, session.bind)
 
-    pd.read_sql
-
-    # convert to DataFrame
-    df = pd.DataFrame(data, columns=[str(col.name) for col in forecast_columns])
-    df["forecast_creation_time"] = pd.to_datetime(df["forecast_creation_time"])
-    df["created_utc"] = pd.to_datetime(df["created_utc"])
-    return df
 
 
 def _get_most_recent_row(df: pd.DataFrame) -> pd.Series:

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "uk-pv-forecast-blend"
 description = "App for blending PV forecasts"
 readme = "README.md"
-requires-python = ">=3.12,<3.12.12"
+requires-python = ">=3.12,<3.13"
 license = {text = "MIT License"}
 authors = [
     {name = "Open Climate Fix", email = "info@openclimatefix.org"},

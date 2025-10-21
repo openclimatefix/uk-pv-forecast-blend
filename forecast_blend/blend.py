@@ -15,7 +15,7 @@ from nowcasting_datamodel.read.read import get_forecast_values_latest
 
 from sqlalchemy.orm.session import Session
 
-from utils import (
+from forecast_blend.utils import (
     blend_forecasts_together,
     check_forecast_created_utc,
     convert_df_to_list_forecast_values,
@@ -113,7 +113,7 @@ def add_p_levels_to_forecast_values(
     :return: DataFrame of blended forecast values with added properties
     """
 
-    logger.debug(f"Adding properties to blended forecast values")
+    logger.debug("Adding properties to blended forecast values")
     all_model_df.reset_index(inplace=True, drop=True)
 
     # get properties out of json if they exist

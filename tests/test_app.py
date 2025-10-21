@@ -11,7 +11,7 @@ from nowcasting_datamodel.models.forecast import (
 )
 from nowcasting_datamodel.models.models import MLModelSQL
 
-from app import app, is_last_forecast_made_before_last_30_minutes_step
+from forecast_blend.app import app, is_last_forecast_made_before_last_30_minutes_step
 
 
 @time_machine.travel("2023-01-01 00:00:01")

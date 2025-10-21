@@ -1,6 +1,6 @@
 import time_machine
 from datetime import datetime, timezone
-from utils import get_start_datetime
+from forecast_blend.utils import get_start_datetime
 
 
 def test_get_start_datetime():

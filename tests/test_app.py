@@ -1,6 +1,8 @@
 import pandas as pd
 import time_machine
 import os
+import asyncio
+import pytest
 
 from nowcasting_datamodel.models import LocationSQL
 from nowcasting_datamodel.models.forecast import (
@@ -31,6 +33,7 @@ def test_is_last_forecast_longer_30_minutes_dont_create(db_session, forecasts):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
+@pytest.mark.asyncio(loop_scope="session")
 def test_app(db_session, forecasts):
 
     # Check the number forecasts have been made
@@ -46,7 +49,7 @@ def test_app(db_session, forecasts):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == N * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * 16
 
-    app(gsps=list(range(0, 11)))
+    asyncio.run(app(gsps=list(range(0, 11))))
 
     assert len(db_session.query(ForecastValueSQL).all()) == (N + 11) * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N + 11) * 16
@@ -55,6 +58,7 @@ def test_app(db_session, forecasts):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
+@pytest.mark.asyncio(loop_scope="session")
 def test_app_twice(db_session, forecasts):
 
     # Check the number forecasts have been made
@@ -70,14 +74,14 @@ def test_app_twice(db_session, forecasts):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == N * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * 16
 
-    app(gsps=list(range(0, 11)))
+    asyncio.run(app(gsps=list(range(0, 11))))
 
     assert len(db_session.query(ForecastValueSQL).all()) == (N + 11) * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N + 11) * 16
     assert len(db_session.query(ForecastSQL).all()) == (2*N) + 11 * 2  # historic and not
     assert len(db_session.query(ForecastValueLatestSQL).all()) == (N+11) * 16
 
-    app(gsps=list(range(0, 11)))
+    asyncio.run(app(gsps=list(range(0, 11))))
 
     # none should change, as only ForecastValueLatestSQL is being updated
     assert len(db_session.query(ForecastValueSQL).all()) == (N + 11) * 16
@@ -87,6 +91,7 @@ def test_app_twice(db_session, forecasts):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
+@pytest.mark.asyncio(loop_scope="session")
 def test_app_only_national(db_session, forecast_national):
 
     # Check the number forecasts have been made
@@ -101,7 +106,7 @@ def test_app_only_national(db_session, forecast_national):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == N * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * 16
 
-    app(gsps=list(range(0, 2)))
+    asyncio.run(app(gsps=list(range(0, 2))))
 
     assert len(db_session.query(ForecastValueSQL).all()) == (N+1) * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N+1) * 16
@@ -110,6 +115,7 @@ def test_app_only_national(db_session, forecast_national):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
+@pytest.mark.asyncio(loop_scope="session")
 def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
     # Check the number forecasts have been made
     # This is for PVnet ecmwf and National_xg only is national
@@ -126,7 +132,7 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == N * number_of_forecast_values
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * number_of_forecast_values
 
-    app(gsps=[0])
+    asyncio.run(app(gsps=[0]))
 
     # get all the blended forecast values latest
     models = db_session.query(MLModelSQL).where(MLModelSQL.name == os.environ["BLEND_NAME"]).all()

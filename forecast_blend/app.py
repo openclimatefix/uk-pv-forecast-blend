@@ -7,12 +7,16 @@ For each GSP
 
 """
 
+import asyncio
 import os
 import json
 import sys
 from datetime import datetime, timedelta, timezone
 import sentry_sdk
 from loguru import logger
+from dp_sdk.ocf import dp
+from grpclib.client import Channel
+
 
 from sqlalchemy.orm.session import Session
 
@@ -40,6 +44,7 @@ from forecast_blend.weights import (
     get_national_blend_weights, 
     get_regional_blend_weights,
 )
+from forecast_blend.save import fetch_dp_gsp_uuid_map, save_forecast_to_data_platform
 import pandas as pd
 
 __version__ = "1.1.9"
@@ -57,7 +62,7 @@ logger.remove(0)
 logger.add(sys.stderr, level=os.getenv("LOG_LEVEL", "INFO"))
 
 
-def app(gsps: list[int] | None = None) -> None:
+async def app(gsps: list[int] | None = None) -> None:
     """run main app"""
 
     blend_name = os.getenv("BLEND_NAME", "blend")
@@ -96,6 +101,7 @@ def app(gsps: list[int] | None = None) -> None:
         # but I think its the best we can do right now
 
         forecasts = []
+        forecast_values_by_gsp_id = {}
         for gsp_id in gsps:
             logger.info(f"Blending forecasts for gsp id {gsp_id}")
             try:
@@ -103,12 +109,13 @@ def app(gsps: list[int] | None = None) -> None:
                 location = get_location(session=session, gsp_id=gsp_id)
 
                 # 1. and 2. load and blend forecast values together
-                forecast_values = get_blend_forecast_values_latest(
+                forecast_values, forecast_values_df = get_blend_forecast_values_latest(
                     session=session,
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,
                     weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
                 )
+                forecast_values_by_gsp_id[gsp_id] = forecast_values_df
 
                 # make Forecast SQL
                 assert len(forecast_values) > 0, "No forecast values made"
@@ -148,6 +155,28 @@ def app(gsps: list[int] | None = None) -> None:
                 update_national=True,
                 update_gsp=True,
             )
+
+    # save to dataplatform
+    channel = Channel(
+        os.getenv("DATA_PLATFORM_HOST", "localhost"),
+        int(os.getenv("DATA_PLATFORM_PORT", "50051")),
+    )
+    client = dp.DataPlatformDataServiceStub(channel)
+    try:
+        gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+        _ = await save_forecast_to_data_platform(
+            forecast_values_by_gsp_id=forecast_values_by_gsp_id,
+            locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
+            model_tag=blend_name,
+            init_time_utc=t0.to_pydatetime(),
+            client=client
+            )
+
+    except Exception as e:
+        logger.error(f"Failed to save forecast to data platform with error {e}")
+    finally:
+        channel.close()
+
 
     logger.info("Finished")
 
@@ -255,4 +284,4 @@ def is_last_forecast_made_before_last_30_minutes_step(session: Session, blend_na
 
 
 if __name__ == "__main__":
-    app()
+    asyncio.run(app())

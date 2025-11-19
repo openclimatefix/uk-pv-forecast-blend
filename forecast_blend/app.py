@@ -157,6 +157,7 @@ async def app(gsps: list[int] | None = None) -> None:
             )
 
     # save to dataplatform
+    logger.info("Saving forecast to data platform")
     channel = Channel(
         os.getenv("DATA_PLATFORM_HOST", "localhost"),
         int(os.getenv("DATA_PLATFORM_PORT", "50051")),

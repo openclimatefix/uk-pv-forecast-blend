@@ -36,7 +36,6 @@ async def save_forecast_to_data_platform(
         init_time_utc: Forecast initialization time
         client: Data platform client. If None, a new client will be created.
     """
-    logger.info("Saving forecast to data platform")
 
     # strip out timezone from init_time_utc, this works better with xarray datetime formats
     init_time_utc = init_time_utc.replace(tzinfo=None)
@@ -95,27 +94,39 @@ def map_values_df_to_dp_requests(
 
     # Reduce singular dimensions
     p50s = forecast_values_df['p50_mw'].values.astype(float)
-    # p10s = forecast_values_df['p10_mw'].values.astype(float)
-    # p90s = forecast_values_df['p90_mw'].values.astype(float)
-
-    # need to normalized by capacity to get fraction
     p50s = p50s * 1*10**6 / float(capacity_watts)
-    # p10s = p10s * 1*10**6 / capacity_watts
-    # p90s = p90s * 1*10**6 / capacity_watts
+    
+    # add p10s and p90s if they exist
+    if 'p10_mw' in forecast_values_df.columns:
+        p10s = forecast_values_df['p10_mw'].values.astype(float) 
+        p10s = p10s * 1*10**6 / float(capacity_watts)
+    else:
+        p10s = [None]*len(p50s)
+    if 'p90_mw' in forecast_values_df.columns:
+        p90s = forecast_values_df['p90_mw'].values.astype(float)
+        p90s = p90s * 1*10**6 / float(capacity_watts)
+    else:
+        p90s = [None]*len(p50s)
 
     forecast_values = []
-    for h, p50 in zip(horizons_mins, p50s, strict=True):
+    for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
+        
         if h <0:
+            # skip negative horizons
             continue
+
+        other_statistics_fractions = {}
+        if p10 is not None:
+            other_statistics_fractions["p10"] = p10
+        if p90 is not None:
+            other_statistics_fractions["p90"] = p90
+
         forecast_values.append(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
                 p50_fraction=p50,
                 metadata=Struct().from_pydict({}),
-                other_statistics_fractions={
-                    # "p10": p10,
-                    # "p90": p90,
-                },
+                other_statistics_fractions=other_statistics_fractions
             ),
         )
 

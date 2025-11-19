@@ -108,7 +108,6 @@ def get_blend_forecast_values_latest(
             "expected_power_generation_megawatts": "p50_mw",
         }
     )
-    # TODO add p10 and p90 if they exist
 
     return forecast_value_list, forecast_values_blended
 
@@ -184,7 +183,7 @@ def add_p_levels_to_forecast_values(
         )
 
         # rename
-        # TODO
+        blended_df.rename(columns={"10": "p10_mw", "90": "p90_mw"}, inplace=True)
 
     else:
         # If blended_on_p_values is None, assign an empty dictionary to properties

@@ -37,7 +37,7 @@ from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from forecast_blend.blend import get_blend_forecast_values_latest
-from forecast_blend.utils import get_start_datetime
+from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values
 from forecast_blend.weights import (
     ALL_MODEL_NAMES,
     backfill_weights, 
@@ -109,15 +109,16 @@ async def app(gsps: list[int] | None = None) -> None:
                 location = get_location(session=session, gsp_id=gsp_id)
 
                 # 1. and 2. load and blend forecast values together
-                forecast_values, forecast_values_df = get_blend_forecast_values_latest(
+                forecast_values_df = get_blend_forecast_values_latest(
                     session=session,
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,
                     weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
                 )
                 forecast_values_by_gsp_id[gsp_id] = forecast_values_df
-
+  
                 # make Forecast SQL
+                forecast_values = convert_df_to_list_forecast_values(forecast_values_df.copy())
                 assert len(forecast_values) > 0, "No forecast values made"
                 forecast = make_forecast(
                     forecast_values=forecast_values,

@@ -10,7 +10,6 @@ from datetime import datetime
 from loguru import logger
 
 import pandas as pd
-from nowcasting_datamodel.models.forecast import ForecastValue
 from nowcasting_datamodel.read.read import get_forecast_values_latest
 
 from sqlalchemy.orm.session import Session
@@ -18,7 +17,6 @@ from sqlalchemy.orm.session import Session
 from forecast_blend.utils import (
     blend_forecasts_together,
     check_forecast_created_utc,
-    convert_df_to_list_forecast_values,
     convert_list_forecast_values_to_df,
 )
 
@@ -29,7 +27,7 @@ def get_blend_forecast_values_latest(
     gsp_id: int,
     weights_df: pd.DataFrame,
     start_datetime: datetime | None = None,
-) -> (list[ForecastValue], pd.DataFrame):
+) -> pd.DataFrame:
     """
     Get forecast values
 
@@ -40,9 +38,7 @@ def get_blend_forecast_values_latest(
     :param start_datetime: optional to filterer target_time by start_datetime
         If None is given then all are returned.
 
-    return: 
-        - List of forecasts values blended from different models
-        - DataFrame of blended forecast values, with the following columns
+    return: DataFrame of blended forecast values, with the following columns
             - target_datetime_utc
             - p50_mw
             - adjust_mw
@@ -98,9 +94,6 @@ def get_blend_forecast_values_latest(
             weights_df=weights_df,
         )
 
-    # convert back to list of forecast values
-    forecast_value_list = convert_df_to_list_forecast_values(forecast_values_blended)
-
     # rename to dataframe columns
     forecast_values_blended = forecast_values_blended.rename(
         columns={
@@ -109,7 +102,7 @@ def get_blend_forecast_values_latest(
         }
     )
 
-    return forecast_value_list, forecast_values_blended
+    return forecast_values_blended
 
 
 def add_p_levels_to_forecast_values(

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 from forecast_blend.blend import get_blend_forecast_values_latest
+from forecast_blend.utils import convert_df_to_list_forecast_values 
 import time_machine
 from nowcasting_datamodel.fake import make_fake_forecasts
 from nowcasting_datamodel.models.forecast import ForecastValueLatestSQL
@@ -51,6 +52,7 @@ def test_get_blend_forecast_values_latest_one_model(db_session):
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         weights_df=weights_df,
     )
+    forecast_values_read = convert_df_to_list_forecast_values(forecast_values_read)
 
     assert len(forecast_values_read) == 2
     assert (
@@ -110,6 +112,7 @@ def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         weights_df=weights_df,
     )
+    forecast_values_read = convert_df_to_list_forecast_values(forecast_values_read)
 
     assert len(forecast_values_read) == 2
     assert (
@@ -193,6 +196,7 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
         start_datetime=datetime(2022, 12, 31, 0, 0, tzinfo=timezone.utc),
         weights_df = weights_df,
     )
+    forecast_values_read = convert_df_to_list_forecast_values(forecast_values_read)
 
     assert len(forecast_values_read) == 7
     assert (
@@ -275,6 +279,7 @@ def test_get_blend_forecast_values_latest_negative(db_session):
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         weights_df=weights_df,
     )
+    forecast_values_read = convert_df_to_list_forecast_values(forecast_values_read)
 
     assert len(forecast_values_read) == 4
     assert (
@@ -334,6 +339,7 @@ def test_get_blend_forecast_values_latest_no_properties(db_session):
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         weights_df=weights_df,
     )
+    forecast_values_read = convert_df_to_list_forecast_values(forecast_values_read)
 
     assert len(forecast_values_read) == 4
     for forecast_value in forecast_values_read:
@@ -389,6 +395,7 @@ def test_get_blend_forecast_values_latest_negative_two(db_session):
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         weights_df=weights_df,
     )
+    forecast_values_read = convert_df_to_list_forecast_values(forecast_values_read)
 
     assert len(forecast_values_read) == 4
     assert (
@@ -466,6 +473,7 @@ def test_get_blend_forecast_three_models(db_session):
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         weights_df=weights_df,
     )
+    forecast_values_read = convert_df_to_list_forecast_values(forecast_values_read)
 
     assert len(forecast_values_read) == 5
     assert (
@@ -550,6 +558,7 @@ def test_get_blend_forecast_three_models_with_gap(db_session):
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
         weights_df=weights_df,
     )
+    forecast_values_read = convert_df_to_list_forecast_values(forecast_values_read)
 
     assert len(forecast_values_read) == 5
     assert (

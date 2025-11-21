@@ -56,6 +56,8 @@ into National_XG if needed - but this should rarely be the case
 - `N_GSP`: The number of gsps you want to pull. N_GSP=1 means only National is run. 
 - `BLEND_NAME`: The model name to save the blend under. Defaults to `"blend"`.
 - `ALLOW_CLOUDCASTING`: Whether to allow `"pvnet_cloud"` to be part of the blend. Defaults to False
+- `DATA_PLATFORM_HOST`: The data platform host name. Default is `localhost`
+- `DATA_PLATFORM_PORT`: The data platform port. Default is `50051`.
 
 # Tests
 

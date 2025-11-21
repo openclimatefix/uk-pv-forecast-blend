@@ -109,10 +109,29 @@ def convert_df_to_list_forecast_values(
     """
     Convert the blended dataframe to a list of ForecastValue objects
 
-    :param forecast_values_blended: Needs to have the columns 'target_time'
-        and 'expected_power_generation_megawatts
-    :return:
+    :param forecast_values_blended: Needs to have the columns 
+     - 'target_time'
+     - 'expected_power_generation_megawatts'
+     We do accepted "target_datetime_utc" and "expected_power_generation_megawatts
+    :return: list of ForecastValue objects
     """
+
+    # rename some columns, if they are they. 
+    if "target_datetime_utc" in forecast_values_blended.columns:
+        forecast_values_blended.rename(
+        columns={
+            "target_datetime_utc": "target_time",
+        }, inplace=True
+    )
+        
+    if "p50_mw" in forecast_values_blended.columns:
+        forecast_values_blended.rename(
+        columns={
+            "p50_mw":"expected_power_generation_megawatts",
+        }, inplace=True
+    )
+
+
     forecast_values = []
     logger.debug(forecast_values_blended)
     for i, row in forecast_values_blended.iterrows():

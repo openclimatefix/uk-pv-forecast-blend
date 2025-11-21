@@ -10,7 +10,6 @@ from datetime import datetime
 from loguru import logger
 
 import pandas as pd
-from nowcasting_datamodel.models.forecast import ForecastValue
 from nowcasting_datamodel.read.read import get_forecast_values_latest
 
 from sqlalchemy.orm.session import Session
@@ -18,7 +17,6 @@ from sqlalchemy.orm.session import Session
 from forecast_blend.utils import (
     blend_forecasts_together,
     check_forecast_created_utc,
-    convert_df_to_list_forecast_values,
     convert_list_forecast_values_to_df,
 )
 
@@ -29,7 +27,7 @@ def get_blend_forecast_values_latest(
     gsp_id: int,
     weights_df: pd.DataFrame,
     start_datetime: datetime | None = None,
-) -> list[ForecastValue]:
+) -> pd.DataFrame:
     """
     Get forecast values
 
@@ -40,7 +38,12 @@ def get_blend_forecast_values_latest(
     :param start_datetime: optional to filterer target_time by start_datetime
         If None is given then all are returned.
 
-    return: List of forecasts values blended from different models
+    return: DataFrame of blended forecast values, with the following columns
+            - target_datetime_utc
+            - p50_mw
+            - adjust_mw
+            - p10_mw (if available)
+            - p90_mw (if available)
     """
 
     logger.info(
@@ -91,8 +94,15 @@ def get_blend_forecast_values_latest(
             weights_df=weights_df,
         )
 
-    # convert back to list of forecast values
-    return convert_df_to_list_forecast_values(forecast_values_blended)
+    # rename to dataframe columns
+    forecast_values_blended = forecast_values_blended.rename(
+        columns={
+            "target_time": "target_datetime_utc",
+            "expected_power_generation_megawatts": "p50_mw",
+        }
+    )
+
+    return forecast_values_blended
 
 
 def add_p_levels_to_forecast_values(
@@ -165,9 +175,14 @@ def add_p_levels_to_forecast_values(
             lambda x: json.loads(x.to_json()) if pd.notnull(x).all() else {}, axis=1
         )
 
+        # rename
+        blended_df.rename(columns={"10": "p10_mw", "90": "p90_mw"}, inplace=True)
+
     else:
         # If blended_on_p_values is None, assign an empty dictionary to properties
         blended_df["properties"] = [{}] * len(blended_df)
+
+    
 
     return blended_df
 

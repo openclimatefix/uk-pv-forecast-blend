@@ -1,0 +1,41 @@
+name: Build and publish Docker image to GHCR
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          # Only push on main branch or tags, otherwise just build (for PRs)
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ghcr.io/openclimatefix/uk-pv-forecast-blend:latest
+            ghcr.io/openclimatefix/uk-pv-forecast-blend:${{ github.sha }}
+            ghcr.io/openclimatefix/uk-pv-forecast-blend:${{ github.ref_name }}

@@ -38,4 +38,4 @@ jobs:
           tags: |
             ghcr.io/openclimatefix/uk-pv-forecast-blend:latest
             ghcr.io/openclimatefix/uk-pv-forecast-blend:${{ github.sha }}
-            ghcr.io/openclimatefix/uk-pv-forecast-blend:${{ github.ref_name }}
+

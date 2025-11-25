@@ -51,4 +51,4 @@ dirty_template = "{tag}"
 testpaths = ["tests"]
 
 [tool.uv.sources]
-dp-sdk = { url = "https://github.com/openclimatefix/data-platform/releases/download/v0.13.2/dp_sdk-0.13.2-py3-none-any.whl" }
+dp-sdk = { url = "https://github.com/openclimatefix/data-platform/releases/download/v0.14.0/dp_sdk-0.14.0-py3-none-any.whl" }

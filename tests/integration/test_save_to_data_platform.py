@@ -59,10 +59,10 @@ async def test_save_to_generation_to_data_platform(client):
     This test uses the `data_platform` fixture to ensure that the Data Platform service
     is running and can accept data.
     """
-    # setup: add location - gsp 1
-    metadata = Struct(fields={"gsp_id": Value(number_value=1)})
+    # setup: add location - gsp 0
+    metadata = Struct(fields={"gsp_id": Value(number_value=0)})
     create_location_request = dp.CreateLocationRequest(
-        location_name="gsp1",
+        location_name="gsp0",
         energy_source=dp.EnergySource.SOLAR,
         geometry_wkt="POINT(0 0)",
         location_type=dp.LocationType.GSP,
@@ -79,6 +79,7 @@ async def test_save_to_generation_to_data_platform(client):
             "p10_mw": [0.3] * 24,
             "p50_mw": [0.5] * 24,
             "p90_mw": [0.7] * 24,
+            "adjust_mw": [0.1] * 24,
             "target_datetime_utc": pd.Timestamp("2025-01-01")
             + pd.timedelta_range(
                 start=0,
@@ -88,12 +89,10 @@ async def test_save_to_generation_to_data_platform(client):
         },
     )
 
-    # fake_data = fake_data.set_index(["target_datetime_utc"])
-
     # Test the functyion
     _ = await save_forecast_to_data_platform(
-        forecast_values_by_gsp_id={1: fake_data},
-        locations_uuid_and_capacity_by_gsp_id={1: {'location_uuid': location_uuid, 'effective_capacity_watts': 1_000_000}},
+        forecast_values_by_gsp_id={0: fake_data},
+        locations_uuid_and_capacity_by_gsp_id={0: {'location_uuid': location_uuid, 'effective_capacity_watts': 1_000_000}},
         client=client,
         model_tag="test_model",
         init_time_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
@@ -101,7 +100,7 @@ async def test_save_to_generation_to_data_platform(client):
 
     # check: read from the data platform to check it was saved
     list_forecasters_response = await client.list_forecasters(dp.ListForecastersRequest())
-    assert len(list_forecasters_response.forecasters) == 1
+    assert len(list_forecasters_response.forecasters) == 2
 
     # check: There is a forecast object
     get_latest_forecasts_request = dp.GetLatestForecastsRequest(
@@ -112,9 +111,11 @@ async def test_save_to_generation_to_data_platform(client):
     get_latest_forecasts_response = await client.get_latest_forecasts(
         get_latest_forecasts_request,
     )
-    assert len(get_latest_forecasts_response.forecasts) == 1
+    assert len(get_latest_forecasts_response.forecasts) == 2
     forecast = get_latest_forecasts_response.forecasts[0]
     assert forecast.forecaster.forecaster_name == "test_model"
+    forecast_adjust = get_latest_forecasts_response.forecasts[1]
+    assert forecast_adjust.forecaster.forecaster_name == "test_model_adjust"
 
     # check: the number of forecast values
     stream_forecast_data_request = dp.StreamForecastDataRequest(

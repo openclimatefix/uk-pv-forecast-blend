@@ -25,9 +25,10 @@ async def save_forecast_to_data_platform(
 
     We do the following steps:
     1. get Forecaster
-    3. loop over all gsps: get the location object
-    4. Forecast the forecast values
-    5. Save to the data platform
+    2. loop over all gsps: get the location object
+    3. Forecast the forecast values
+    4. Save to the data platform
+    5. If gsp_id=0 also save adjusted forecast
 
     Args:
         forecast_normed_da: DataArray of normalized forecasts for all GSPs
@@ -63,6 +64,25 @@ async def save_forecast_to_data_platform(
         )
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
+        # 5. save adjusted if gsp_id=0
+        if gsp_id == 0:
+
+            forecast_values = map_values_df_to_dp_requests(
+            forecast_values_by_gsp_id[gsp_id],
+            init_time_utc=init_time_utc,
+            capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id]["effective_capacity_watts"],
+            use_adjuster=True,
+        )
+            forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag+"_adjust")
+            forecast_request = dp.CreateForecastRequest(
+                forecaster=forecaster,
+                location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id]["location_uuid"],
+                energy_source=dp.EnergySource.SOLAR,
+                init_time_utc=init_time_utc.replace(tzinfo=UTC),
+                values=forecast_values,
+            )
+            tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
+
     logger.info(f"Saving {len(tasks)} forecasts to Data Platform")
     list_results = await asyncio.gather(*tasks, return_exceptions=True)
     for exc in filter(lambda x: isinstance(x, Exception), list_results):
@@ -75,6 +95,7 @@ def map_values_df_to_dp_requests(
     forecast_values_df: pd.DataFrame,
     init_time_utc: datetime,
     capacity_watts: int,
+    use_adjuster: bool = False
 ) -> list[dp.CreateForecastRequestForecastValue]:
     """Convert a Dataframe for a single GSP to a list of ForecastValue objects.
 
@@ -84,13 +105,23 @@ def map_values_df_to_dp_requests(
             - p10_mw (optional)
             - p50_mw
             - p90_mw (optional)
+            - adjuster_mw
         init_time_utc: Forecast initialization time
+        capacity_watts: Capacity of the location in watts
+        use_adjuster: Whether to apply the adjuster or not
     """
 
     # create horizon mins
     target_datetime_utc = pd.to_datetime(forecast_values_df['target_datetime_utc'].values)
     horizons_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
     horizons_mins = horizons_mins.astype(int)
+
+    # get adjuster values
+    if use_adjuster:
+        for p_col in ['p10_mw', 'p50_mw', 'p90_mw']:
+            if p_col in forecast_values_df.columns:
+                forecast_values_df[p_col] = forecast_values_df[p_col] - forecast_values_df['adjust_mw']
+                forecast_values_df[p_col] = forecast_values_df[p_col].clip(lower=0)
 
     # Reduce singular dimensions
     p50s = forecast_values_df['p50_mw'].values.astype(float)

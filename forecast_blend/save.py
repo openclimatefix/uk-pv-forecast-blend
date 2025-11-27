@@ -118,9 +118,7 @@ def map_values_df_to_dp_requests(
 
     # get adjuster values
     if use_adjuster:
-        forecast_values_df['p50_mw'] = forecast_values_df['p50_mw'] - forecast_values_df['adjust_mw']
-        forecast_values_df['p50_mw'] = forecast_values_df['p50_mw'].clip(lower=0)
-        for p_col in ['p10_mw', 'p90_mw']:
+        for p_col in ['p10_mw', 'p50_mw', 'p90_mw']:
             if p_col in forecast_values_df.columns:
                 forecast_values_df[p_col] = forecast_values_df[p_col] - forecast_values_df['adjust_mw']
                 forecast_values_df[p_col] = forecast_values_df[p_col].clip(lower=0)

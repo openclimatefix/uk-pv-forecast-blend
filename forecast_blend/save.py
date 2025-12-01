@@ -73,9 +73,9 @@ async def save_forecast_to_data_platform(
             capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id]["effective_capacity_watts"],
             use_adjuster=True,
         )
-            forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag+"_adjust")
+            forecaster_adjust = await create_forecaster_if_not_exists(client=client, model_tag=model_tag+"_adjust")
             forecast_request = dp.CreateForecastRequest(
-                forecaster=forecaster,
+                forecaster=forecaster_adjust,
                 location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id]["location_uuid"],
                 energy_source=dp.EnergySource.SOLAR,
                 init_time_utc=init_time_utc.replace(tzinfo=UTC),

@@ -17,13 +17,17 @@ def test_get_horizon_maes():
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_national_blend_weights(forecast_national_ecmwf_and_xg, db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_national_blend_weights(forecast_national_ecmwf_and_xg, db_session):
     t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
 
-    weights_df = get_national_blend_weights(session=db_session, t0=t0)
+    weights_df = await get_national_blend_weights(session=db_session, t0=t0)
 
     # Check columns and indices
     assert set(weights_df.columns)==set(["pvnet_ecmwf", "National_xg"])
+    print("################ ")
+    print(weights_df)
+    print("################ ")
     assert (
         pd.date_range("2023-01-01 00:30", "2023-01-02 12:00", freq="30min", tz="UTC")
         .equals(weights_df.index)
@@ -41,25 +45,26 @@ def test_get_national_blend_weights(forecast_national_ecmwf_and_xg, db_session):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_regional_blend_weights(forecast_national_ecmwf_and_xg, db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_regional_blend_weights(forecast_national_ecmwf_and_xg, db_session):
     t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
 
-    weights_df = get_regional_blend_weights(session=db_session, t0=t0)
+    weights_df = await get_regional_blend_weights(session=db_session, t0=t0)
 
     # For regional we can only use pvnet_ecmwf since National_xg is only for national
     
-    # Check columns and indices
+    # Check columns and indices
     assert weights_df.columns==["pvnet_ecmwf"]
     assert (
         pd.date_range("2023-01-01 00:30", "2023-01-01 08:00", freq="30min", tz="UTC")
         .equals(weights_df.index)
     )
 
-    # We use pvnet_ecmwf exclusively for all time steps
+    # We use pvnet_ecmwf exclusively for all time steps
     assert (weights_df.values==1).all()
 
     # In this case the weights should start at 2h later since the forecast is 2h old
-    weights_df = get_regional_blend_weights(session=db_session, t0=t0+pd.Timedelta("2h"))
+    weights_df = await get_regional_blend_weights(session=db_session, t0=t0+pd.Timedelta("2h"))
     
     # Check columns and indices
     assert weights_df.columns==["pvnet_ecmwf"]
@@ -73,11 +78,12 @@ def test_get_regional_blend_weights(forecast_national_ecmwf_and_xg, db_session):
 # Test with and without excluding the pvnet_cloud model
 test_settings = [(None, "pvnet_cloud"),  (["pvnet_cloud"], "pvnet_v2")]
 @time_machine.travel("2023-01-01 00:00:01")
+@pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.parametrize("exclude_models, intraday_model", test_settings)
-def test_get_regional_blend_weights_cloud(forecast_national_all_now, db_session, exclude_models, intraday_model):
+async def test_get_regional_blend_weights_cloud(forecast_national_all_now, db_session, exclude_models, intraday_model):
     t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
 
-    weights_df = get_regional_blend_weights(session=db_session, t0=t0, exclude_models=exclude_models)
+    weights_df = await get_regional_blend_weights(session=db_session, t0=t0, exclude_models=exclude_models)
     
     # Check the expected models have been returned
     assert set(weights_df.columns)==set([intraday_model, "pvnet_day_ahead"])

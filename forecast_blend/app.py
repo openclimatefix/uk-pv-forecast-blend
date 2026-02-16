@@ -86,8 +86,8 @@ async def app(gsps: list[int] | None = None) -> None:
 
         model = get_blend_model(session, blend_name)
 
-        national_weights_df = get_national_blend_weights(session, t0, exclude_models)
-        regional_weights_df = get_regional_blend_weights(session, t0, exclude_models)
+        national_weights_df = await get_national_blend_weights(session, t0, exclude_models)
+        regional_weights_df = await get_regional_blend_weights(session, t0, exclude_models)
 
         national_weights_df = backfill_weights(national_weights_df, start_datetime)
         regional_weights_df = backfill_weights(regional_weights_df, start_datetime)

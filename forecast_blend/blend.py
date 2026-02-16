@@ -6,12 +6,12 @@
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from loguru import logger
 
 import pandas as pd
 from nowcasting_datamodel.read.read import get_forecast_values_latest
-
+from nowcasting_datamodel.models import ForecastValue
 from sqlalchemy.orm.session import Session
 
 from forecast_blend.utils import (
@@ -19,6 +19,175 @@ from forecast_blend.utils import (
     convert_list_forecast_values_to_df,
 )
 
+import os
+
+import asyncio
+from grpclib.client import Channel
+from dp_sdk.ocf import dp
+
+
+def read_from_data_platform() -> bool:
+    return os.getenv("READ_FROM_DATA_PLATFORM", "false").lower() == "true"
+
+
+def get_data_platform_connection() -> tuple[str, int]:
+    """Get the Data Platform host and port from environment variables."""
+    host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+    port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
+    return host, port
+
+async def _fetch_dp_forecast_values(
+    location_uuid: str,
+    model_name: str,
+    start_datetime: datetime | None,
+):
+    """Fetch forecast values from Data Platform for a specific location and model."""
+    host, port = get_data_platform_connection()
+
+    logger.debug(
+        f"Fetching forecasts from Data Platform at {host}:{port} "
+        f"for location {location_uuid} and model {model_name}"
+    )
+
+    async with Channel(host=host, port=port) as channel:
+        client = dp.DataPlatformDataServiceStub(channel)
+        
+        # Get the latest forecasts for this location
+        response = await client.get_latest_forecasts(
+            dp.GetLatestForecastsRequest(
+                location_uuid=location_uuid,
+                energy_source=dp.EnergySource.SOLAR,
+            )
+        )
+
+        logger.debug(f"Received {len(response.forecasts)} forecasts from Data Platform")
+        
+        # Filter by model name (forecaster tag)
+        matching_forecasts = [
+            f for f in response.forecasts 
+            if f.forecaster.forecaster_name == model_name
+        ]
+        
+        if not matching_forecasts:
+            logger.warning(
+                f"No forecasts found for model '{model_name}' at location {location_uuid}"
+            )
+            return []
+        
+        # Take the most recent forecast
+        forecast = matching_forecasts[0]
+        
+        timeseries_response = await client.get_forecast_as_timeseries(
+            dp.GetForecastAsTimeseriesRequest(
+                location_uuid=location_uuid,
+                energy_source=dp.EnergySource.SOLAR,
+                forecaster=forecast.forecaster,
+                time_window=dp.TimeWindow(
+                    start_timestamp_utc=forecast.initialization_timestamp_utc,
+                    end_timestamp_utc=forecast.initialization_timestamp_utc + timedelta(hours=48),
+                )
+            )
+        )
+
+        forecast_values = timeseries_response.values
+        if start_datetime:
+            forecast_values = [
+                v for v in forecast_values
+                if v.target_timestamp_utc.replace(tzinfo=None) >= start_datetime
+            ]
+        
+        return forecast_values
+
+
+async def _fetch_dp_gsp_location_uuid(gsp_id: int):
+    """Fetch the location UUID for a given GSP ID from Data Platform."""
+    host, port = get_data_platform_connection()
+
+    async with Channel(host=host, port=port) as channel:
+        client = dp.DataPlatformDataServiceStub(channel)
+        
+        # List all locations and find the one matching the GSP ID
+        response = await client.list_locations(
+            dp.ListLocationsRequest(
+                energy_source_filter=dp.EnergySource.SOLAR,
+                location_type_filter=dp.LocationType.GSP,
+            )
+        )
+        
+        for location in response.locations:
+            # Check if metadata contains gsp_id
+            metadata = location.metadata
+
+            if metadata and hasattr(metadata, "fields"):
+                if "gsp_id" in metadata.fields:
+                    gsp_field = metadata.fields["gsp_id"]
+                    location_gsp_id = int(gsp_field.number_value)
+
+                    if location_gsp_id == gsp_id:
+                        return location.location_uuid
+
+        
+        raise ValueError(f"No location found for GSP ID {gsp_id} in Data Platform")
+
+
+def _get_forecast_values_from_db(
+    session: Session,
+    gsp_id: int,
+    model_name: str,
+    start_datetime: datetime | None,
+):
+    """Get forecast values from the database (nowcasting_datamodel)."""
+    return get_forecast_values_latest(
+        session=session,
+        gsp_id=gsp_id,
+        start_datetime=start_datetime,
+        model_name=model_name,
+    )
+
+
+async def _get_forecast_values_from_data_platform(
+    gsp_id: int,
+    model_name: str,
+    start_datetime: datetime | None,
+):
+    """Get forecast values from Data Platform."""
+    logger.debug(
+        f"Getting forecast values from Data Platform for GSP {gsp_id}, "
+        f"model {model_name}, start_datetime {start_datetime}"
+    )
+    
+    # Get location UUID for this GSP
+    location_uuid = await _fetch_dp_gsp_location_uuid(gsp_id)
+
+    dp_values = await _fetch_dp_forecast_values(
+        location_uuid=location_uuid,
+        model_name=model_name,
+        start_datetime=start_datetime,
+)
+
+
+    # Convert Data Platform forecast values to ForecastValue objects
+    forecast_values = []
+    for dp_value in dp_values:
+        # Convert from Data Platform format to nowcasting_datamodel format
+        # Note: adjust_mw might not be available in DP, defaulting to 0
+        properties = {}
+        if hasattr(dp_value, 'plevel_10') and dp_value.plevel_10:
+            properties['10'] = dp_value.plevel_10
+        if hasattr(dp_value, 'plevel_90') and dp_value.plevel_90:
+            properties['90'] = dp_value.plevel_90
+            
+        forecast_values.append(
+            ForecastValue(
+                target_time=dp_value.target_timestamp_utc.replace(tzinfo=None),
+                expected_power_generation_megawatts = dp_value.p50_value_fraction * dp_value.effective_capacity_watts/ 1_000_000,
+                adjust_mw=0,  # adjust_mw is not provided by DP, setting to 0
+                properties=properties,
+            )
+        )
+
+    logger.debug(f"Converted {len(forecast_values)} forecast values from Data Platform")
+    return forecast_values
 
 
 def get_blend_forecast_values_latest(
@@ -54,12 +223,19 @@ def get_blend_forecast_values_latest(
     # get forecast for the different models
     forecast_values_all_model = []
     for model_name in model_names:
-        forecast_values_one_model = get_forecast_values_latest(
-            session=session,
-            gsp_id=gsp_id,
-            start_datetime=start_datetime,
-            model_name=model_name,
-        )
+        if read_from_data_platform():
+            forecast_values_one_model = asyncio.run(_get_forecast_values_from_data_platform(
+                gsp_id=gsp_id,
+                start_datetime=start_datetime,
+                model_name=model_name,
+            ))
+        else:
+            forecast_values_one_model = _get_forecast_values_from_db(
+                session=session,
+                gsp_id=gsp_id,
+                start_datetime=start_datetime,
+                model_name=model_name,
+            )
 
 
         if len(forecast_values_one_model) == 0:

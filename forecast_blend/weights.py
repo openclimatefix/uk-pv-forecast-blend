@@ -7,6 +7,9 @@ from typing import Callable
 from datetime import timezone
 from loguru import logger
 
+from grpclib.client import Channel
+from dp_sdk.ocf import dp
+
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 
@@ -18,6 +21,8 @@ ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
 BLEND_KERNEL = [0.75, 0.5, 0.25]
 MIN_FORECAST_HORIZON = pd.Timedelta("30min")
 
+def read_from_data_platform() -> bool:
+    return os.getenv("READ_FROM_DATA_PLATFORM", "false").lower() == "true"
 
 def get_horizon_maes() -> pd.DataFrame:
     """Loads Mean Absolute Error (MAE) curves for different forecast horizons from a CSV file
@@ -77,6 +82,110 @@ def get_latest_forecast_metadata(
 
     return pd.read_sql(query.statement, session.bind)
 
+
+async def _fetch_latest_forecast_metadata_from_dp(
+    model_names: list[str],
+    t0: pd.Timestamp,
+    max_delay: pd.Timedelta,
+) -> pd.DataFrame:
+    """Gets the most recent forecast metadata from Data Platform.
+
+    Args:
+        model_names: List of model names (forecaster tags) to filter to
+        t0: The blend forecast init-time
+        max_delay: Max delay with respect to t0 to consider using forecast in the blend
+
+    Returns:
+        A pandas DataFrame with columns 'created_utc', 'forecast_creation_time',
+        'location_id', and 'name' (model name) representing the latest forecasts
+    """
+    host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+    port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
+
+    logger.debug(
+        f"Fetching forecast metadata from Data Platform at {host}:{port} "
+        f"for models {model_names}"
+    )
+
+    t0_datetime = t0.to_pydatetime().replace(tzinfo=timezone.utc)
+    earliest_creation_time = t0_datetime - max_delay
+
+    async with Channel(host=host, port=port) as channel:
+        client = dp.DataPlatformDataServiceStub(channel)
+
+        # Get all locations
+        locations_response = await client.list_locations(
+            dp.ListLocationsRequest(
+                energy_source_filter=dp.EnergySource.SOLAR,
+            )
+        )
+
+        rows = []
+        for location in locations_response.locations:
+            # Get latest forecasts for this location
+            try:
+                forecasts_response = await client.get_latest_forecasts(
+                    dp.GetLatestForecastsRequest(
+                        location_uuid=location.location_uuid,
+                        energy_source=dp.EnergySource.SOLAR,
+                    )
+                )
+
+                for forecast in forecasts_response.forecasts:
+                    forecaster_name = forecast.forecaster.forecaster_name
+                    if forecaster_name in model_names:
+                        # Check if forecast is recent enough
+                        init_time = forecast.initialization_timestamp_utc
+                        if init_time and init_time >= earliest_creation_time:
+                            rows.append({
+                                'created_utc': init_time,
+                                'forecast_creation_time': init_time,
+                                'location_id': location.location_uuid,
+                                'name': forecaster_name,
+                            })
+            except Exception as e:
+                logger.warning(f"Failed to get forecasts for location {location.location_uuid}: {e}")
+                continue
+
+        if not rows:
+            logger.warning("No forecast metadata found from Data Platform")
+            return pd.DataFrame(columns=['created_utc', 'forecast_creation_time', 'location_id', 'name'])
+
+        return pd.DataFrame(rows)
+
+
+async def get_latest_forecast_metadata_with_switch(
+    session: Session | None,
+    model_names: list[str],
+    t0: pd.Timestamp,
+    max_delay: pd.Timedelta,
+) -> pd.DataFrame:
+    """Get latest forecast metadata from either DB or Data Platform based on switch.
+
+    Args:
+        session: Database session (can be None if using Data Platform)
+        model_names: List of model names to filter to
+        t0: The blend forecast init-time
+        max_delay: Max delay with respect to t0 to consider using forecast in the blend
+
+    Returns:
+        A pandas DataFrame with forecast metadata
+    """
+    if read_from_data_platform():
+        logger.info("Reading forecast metadata from Data Platform")
+        return await _fetch_latest_forecast_metadata_from_dp(
+            model_names=model_names,
+            t0=t0,
+            max_delay=max_delay,
+        )
+    else:
+        logger.info("Reading forecast metadata from database")
+        return get_latest_forecast_metadata(
+            session=session,
+            model_names=model_names,
+            t0=t0,
+            max_delay=max_delay,
+        )
 
 
 def _get_most_recent_row(df: pd.DataFrame) -> pd.Series:
@@ -314,7 +423,7 @@ def calculate_optimal_blend_weights(
     return pd.DataFrame(blend_results, index=df_mae.index)
 
 
-def get_national_blend_weights(
+async def get_national_blend_weights(
     session: Session, 
     t0: pd.Timestamp, 
     exclude_models: list[str] | None = None,
@@ -360,7 +469,8 @@ def get_national_blend_weights(
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
-    df_latest_forecast_ids = get_latest_forecast_metadata(
+    # Uses Data Platform or DB based on READ_FROM_DATA_PLATFORM env var
+    df_latest_forecast_ids = await get_latest_forecast_metadata_with_switch(
         session=session, 
         model_names=all_model_names, 
         t0=t0, 
@@ -416,7 +526,7 @@ def get_national_blend_weights(
     return df_all_weights
 
 
-def get_regional_blend_weights(
+async def get_regional_blend_weights(
     session: Session, 
     t0: pd.Timestamp, 
     exclude_models: list[str] = None,
@@ -462,7 +572,8 @@ def get_regional_blend_weights(
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
-    df_latest_forecast_ids = get_latest_forecast_metadata(
+    # Uses Data Platform or DB based on READ_FROM_DATA_PLATFORM env var
+    df_latest_forecast_ids = await get_latest_forecast_metadata_with_switch(
         session=session, 
         model_names=all_regional_models, 
         t0=t0, 

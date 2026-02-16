@@ -1,1 +1,1 @@
-""" For blending forecasts """
+""" For blending forecasts together """

@@ -16,7 +16,6 @@ from sqlalchemy.orm.session import Session
 
 from forecast_blend.utils import (
     blend_forecasts_together,
-    check_forecast_created_utc,
     convert_list_forecast_values_to_df,
 )
 
@@ -76,11 +75,8 @@ def get_blend_forecast_values_latest(
             )
             forecast_values_all_model.append([model_name, forecast_values_one_model])
 
-    # check the created_utc is valid for each forecast
-    forecast_values_all_model_valid = check_forecast_created_utc(forecast_values_all_model)
-
     # make into dataframe
-    forecast_values_all_model = convert_list_forecast_values_to_df(forecast_values_all_model_valid)
+    forecast_values_all_model = convert_list_forecast_values_to_df(forecast_values_all_model)
 
     # blend together
     forecast_values_blended = blend_forecasts_together(forecast_values_all_model, weights_df)

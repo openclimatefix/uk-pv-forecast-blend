@@ -25,9 +25,6 @@ async def test_get_national_blend_weights(forecast_national_ecmwf_and_xg, db_ses
 
     # Check columns and indices
     assert set(weights_df.columns)==set(["pvnet_ecmwf", "National_xg"])
-    print("################ ")
-    print(weights_df)
-    print("################ ")
     assert (
         pd.date_range("2023-01-01 00:30", "2023-01-02 12:00", freq="30min", tz="UTC")
         .equals(weights_df.index)

@@ -21,7 +21,6 @@ from forecast_blend.utils import (
 
 import os
 
-import asyncio
 from grpclib.client import Channel
 from dp_sdk.ocf import dp
 
@@ -29,20 +28,14 @@ from dp_sdk.ocf import dp
 def read_from_data_platform() -> bool:
     return os.getenv("READ_FROM_DATA_PLATFORM", "false").lower() == "true"
 
-
-def get_data_platform_connection() -> tuple[str, int]:
-    """Get the Data Platform host and port from environment variables."""
-    host = os.getenv("DATA_PLATFORM_HOST", "localhost")
-    port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
-    return host, port
-
 async def _fetch_dp_forecast_values(
     location_uuid: str,
     model_name: str,
     start_datetime: datetime | None,
 ):
     """Fetch forecast values from Data Platform for a specific location and model."""
-    host, port = get_data_platform_connection()
+    host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+    port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
 
     logger.debug(
         f"Fetching forecasts from Data Platform at {host}:{port} "
@@ -77,6 +70,7 @@ async def _fetch_dp_forecast_values(
         # Take the most recent forecast
         forecast = matching_forecasts[0]
         
+        
         timeseries_response = await client.get_forecast_as_timeseries(
             dp.GetForecastAsTimeseriesRequest(
                 location_uuid=location_uuid,
@@ -101,7 +95,8 @@ async def _fetch_dp_forecast_values(
 
 async def _fetch_dp_gsp_location_uuid(gsp_id: int):
     """Fetch the location UUID for a given GSP ID from Data Platform."""
-    host, port = get_data_platform_connection()
+    host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+    port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
 
     async with Channel(host=host, port=port) as channel:
         client = dp.DataPlatformDataServiceStub(channel)
@@ -190,7 +185,7 @@ async def _get_forecast_values_from_data_platform(
     return forecast_values
 
 
-def get_blend_forecast_values_latest(
+async def get_blend_forecast_values_latest(
     session: Session,
     gsp_id: int,
     weights_df: pd.DataFrame,
@@ -224,11 +219,11 @@ def get_blend_forecast_values_latest(
     forecast_values_all_model = []
     for model_name in model_names:
         if read_from_data_platform():
-            forecast_values_one_model = asyncio.run(_get_forecast_values_from_data_platform(
+            forecast_values_one_model = await _get_forecast_values_from_data_platform(
                 gsp_id=gsp_id,
                 start_datetime=start_datetime,
                 model_name=model_name,
-            ))
+            )
         else:
             forecast_values_one_model = _get_forecast_values_from_db(
                 session=session,

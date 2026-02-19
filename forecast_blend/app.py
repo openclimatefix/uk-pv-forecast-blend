@@ -109,7 +109,7 @@ async def app(gsps: list[int] | None = None) -> None:
                 location = get_location(session=session, gsp_id=gsp_id)
 
                 # 1. and 2. load and blend forecast values together
-                forecast_values_df = get_blend_forecast_values_latest(
+                forecast_values_df = await get_blend_forecast_values_latest(
                     session=session,
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,

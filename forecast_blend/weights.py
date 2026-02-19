@@ -13,6 +13,8 @@ from dp_sdk.ocf import dp
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 
+from forecast_blend.utils import get_data_platform_connection, read_from_data_platform
+
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]
 INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_ecmwf", "pvnet_cloud"]
@@ -21,8 +23,6 @@ ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
 BLEND_KERNEL = [0.75, 0.5, 0.25]
 MIN_FORECAST_HORIZON = pd.Timedelta("30min")
 
-def read_from_data_platform() -> bool:
-    return os.getenv("READ_FROM_DATA_PLATFORM", "false").lower() == "true"
 
 def get_horizon_maes() -> pd.DataFrame:
     """Loads Mean Absolute Error (MAE) curves for different forecast horizons from a CSV file
@@ -99,8 +99,7 @@ async def _fetch_latest_forecast_metadata_from_dp(
         A pandas DataFrame with columns 'created_utc', 'forecast_creation_time',
         'location_id', and 'name' (model name) representing the latest forecasts
     """
-    host = os.getenv("DATA_PLATFORM_HOST", "localhost")
-    port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
+    host, port = get_data_platform_connection()
 
     logger.debug(
         f"Fetching forecast metadata from Data Platform at {host}:{port} "

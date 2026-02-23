@@ -20,16 +20,12 @@ from forecast_blend.utils import (
     blend_forecasts_together,
     convert_list_forecast_values_to_df,
     get_data_platform_connection,
+    read_from_data_platform,
 )
-
-import os
 
 from grpclib.client import Channel
 from dp_sdk.ocf import dp
 
-
-def read_from_data_platform() -> bool:
-    return os.getenv("READ_FROM_DATA_PLATFORM", "false").lower() == "true"
 
 async def _fetch_dp_forecast_values(
     client: dp.DataPlatformDataServiceStub,

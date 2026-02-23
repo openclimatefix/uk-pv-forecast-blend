@@ -20,7 +20,6 @@ from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
 from importlib.metadata import version
 from forecast_blend.blend import (
-    _fetch_dp_gsp_location_uuid,
     _fetch_dp_forecast_values,
     _get_forecast_values_from_data_platform,
 )
@@ -201,6 +200,7 @@ async def test_read_forecast_metadata_from_data_platform(
     max_delay = pd.Timedelta("36h")
 
     df = await _fetch_latest_forecast_metadata_from_dp(
+        client=client,
         model_names=["pvnet_day_ahead"],
         t0=t0,
         max_delay=max_delay,
@@ -248,12 +248,13 @@ async def test_read_forecast_values_from_data_platform(
     # So we'll test the underlying async function directly
 
     # First verify we can find the location
-    location_uuid = await _fetch_dp_gsp_location_uuid(gsp_id=0)
+    location_uuid = test_data["locations"][0]["uuid"]
     assert location_uuid == test_data["locations"][0]["uuid"]
 
     # Then fetch forecast values
     start_datetime = init_time.replace(tzinfo=None)
     values = await _fetch_dp_forecast_values(
+        client=client,
         location_uuid=location_uuid,
         model_name="pvnet_day_ahead",
         start_datetime=start_datetime,
@@ -313,13 +314,15 @@ async def test_blend_forecasts_from_data_platform(
 
     # Get forecasts for both models
     pvnet_forecast = await _get_forecast_values_from_data_platform(
-        gsp_id=0,
+        client=client,
+        location_uuid=test_data["locations"][0]["uuid"],
         model_name="pvnet_day_ahead",
         start_datetime=init_time.replace(tzinfo=None),
     )
 
     xg_forecast = await _get_forecast_values_from_data_platform(
-        gsp_id=0,
+        client=client,
+        location_uuid=test_data["locations"][0]["uuid"],
         model_name="national_xg",
         start_datetime=init_time.replace(tzinfo=None),
     )
@@ -349,6 +352,7 @@ async def test_read_with_no_forecasts_returns_empty(
 
     # Try to fetch forecasts for a model that doesn't exist
     values = await _fetch_dp_forecast_values(
+        client=dp_client[0],
         location_uuid=test_data["locations"][0]["uuid"],
         model_name="nonexistent_model",
         start_datetime=datetime.datetime(2025, 1, 1),

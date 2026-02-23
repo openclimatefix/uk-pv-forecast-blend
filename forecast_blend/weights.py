@@ -1,5 +1,6 @@
 """Functions to make weights for blending"""
 
+import asyncio
 import numpy as np
 import os
 import pandas as pd
@@ -84,10 +85,12 @@ def get_latest_forecast_metadata(
 
 
 async def _fetch_latest_forecast_metadata_from_dp(
+    client: dp.DataPlatformDataServiceStub,
     model_names: list[str],
     t0: pd.Timestamp,
     max_delay: pd.Timedelta,
 ) -> pd.DataFrame:
+
     """Gets the most recent forecast metadata from Data Platform.
 
     Args:
@@ -99,58 +102,61 @@ async def _fetch_latest_forecast_metadata_from_dp(
         A pandas DataFrame with columns 'created_utc', 'forecast_creation_time',
         'location_id', and 'name' (model name) representing the latest forecasts
     """
-    host, port = get_data_platform_connection()
 
-    logger.debug(
-        f"Fetching forecast metadata from Data Platform at {host}:{port} "
-        f"for models {model_names}"
-    )
 
     t0_datetime = t0.to_pydatetime().replace(tzinfo=timezone.utc)
     earliest_creation_time = t0_datetime - max_delay
 
-    async with Channel(host=host, port=port) as channel:
-        client = dp.DataPlatformDataServiceStub(channel)
 
-        # Get all locations
-        locations_response = await client.list_locations(
-            dp.ListLocationsRequest(
-                energy_source_filter=dp.EnergySource.SOLAR,
+    # Get all locations
+    locations_response = await client.list_locations(
+        dp.ListLocationsRequest(
+            energy_source_filter=dp.EnergySource.SOLAR,
+        )
+    )
+    tasks = [
+        asyncio.create_task(
+            client.get_latest_forecasts(
+                dp.GetLatestForecastsRequest(
+                    location_uuid=location.location_uuid,
+                    energy_source=dp.EnergySource.SOLAR,
+                )
             )
         )
+        for location in locations_response.locations
+    ]
 
-        rows = []
-        for location in locations_response.locations:
-            # Get latest forecasts for this location
-            try:
-                forecasts_response = await client.get_latest_forecasts(
-                    dp.GetLatestForecastsRequest(
-                        location_uuid=location.location_uuid,
-                        energy_source=dp.EnergySource.SOLAR,
-                    )
-                )
+    responses = await asyncio.gather(*tasks, return_exceptions=True)
 
-                for forecast in forecasts_response.forecasts:
-                    forecaster_name = forecast.forecaster.forecaster_name
-                    if forecaster_name in model_names:
-                        # Check if forecast is recent enough
-                        init_time = forecast.initialization_timestamp_utc
-                        if init_time and init_time >= earliest_creation_time:
-                            rows.append({
-                                'created_utc': init_time,
-                                'forecast_creation_time': init_time,
-                                'location_id': location.location_uuid,
-                                'name': forecaster_name,
-                            })
-            except Exception as e:
-                logger.warning(f"Failed to get forecasts for location {location.location_uuid}: {e}")
-                continue
 
-        if not rows:
-            logger.warning("No forecast metadata found from Data Platform")
-            return pd.DataFrame(columns=['created_utc', 'forecast_creation_time', 'location_id', 'name'])
+    rows = []
+    for response in responses:
+        try:
+            for forecast in response.forecasts:
+                forecaster_name = forecast.forecaster.forecaster_name
 
-        return pd.DataFrame(rows)
+                if forecaster_name not in model_names:
+                    continue
+
+                init_time = forecast.initialization_timestamp_utc
+
+                if init_time and init_time >= earliest_creation_time:
+                    rows.append({
+                        "created_utc": init_time,
+                        "forecast_creation_time": init_time,
+                        "location_id": forecast.location_uuid,
+                        "name": forecaster_name,
+                    })
+
+        except Exception as e:
+            logger.warning(f"Skipping failed forecast response: {e}")
+            continue
+
+    if not rows:
+        logger.warning("No forecast metadata found from Data Platform")
+        return pd.DataFrame(columns=['created_utc', 'forecast_creation_time', 'location_id', 'name'])
+
+    return pd.DataFrame(rows)
 
 
 async def get_latest_forecast_metadata_with_switch(
@@ -171,12 +177,17 @@ async def get_latest_forecast_metadata_with_switch(
         A pandas DataFrame with forecast metadata
     """
     if read_from_data_platform():
-        logger.info("Reading forecast metadata from Data Platform")
-        return await _fetch_latest_forecast_metadata_from_dp(
-            model_names=model_names,
-            t0=t0,
-            max_delay=max_delay,
-        )
+        host, port = get_data_platform_connection()
+
+        async with Channel(host=host, port=port) as channel:
+            client = dp.DataPlatformDataServiceStub(channel)
+            logger.info("Reading forecast metadata from Data Platform")
+            return await _fetch_latest_forecast_metadata_from_dp(
+                client=client,
+                model_names=model_names,
+                t0=t0,
+                max_delay=max_delay,
+            )
     else:
         logger.info("Reading forecast metadata from database")
         return get_latest_forecast_metadata(

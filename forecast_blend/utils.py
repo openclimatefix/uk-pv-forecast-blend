@@ -20,50 +20,6 @@ def get_data_platform_connection() -> tuple[str, int]:
     port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
     return host, port
 
-
-def check_forecast_created_utc(
-    forecast_values_all_model: list[tuple[str, list[ForecastValue]]]
-) -> list[tuple[str, list[ForecastValue]]]:
-    """
-    Check if forecasts are valid.
-
-    We only consider forecast less than 6 hours old.
-    If all forecast are older than 6 hours, we used both.
-
-    :param forecast_values_all_model: list of forecast
-    :return: list of valid forecasts
-    """
-    one_forecast_created_within_timedelta = True
-
-    # if all forecasts are later than 6 hours, then we use the blend,
-    # otherwise we only use forecast less than 6 hours
-    # remove all forecasts that are older than 6 hours
-    forecast_values_all_model_valid = []
-    for model_name, forecast_values_one_model in forecast_values_all_model:
-
-        one_forecast_created = forecast_values_one_model[-1].created_utc
-
-        one_forecast_created_within_timedelta = (
-            one_forecast_created > datetime.now(timezone.utc) - timedelta(hours=6)
-        )
-
-        if one_forecast_created_within_timedelta:
-            logger.debug(
-                f"Will be using forecast {model_name} "
-                f"as it is newer than 6 hours ({one_forecast_created=})"
-            )
-            forecast_values_all_model_valid.append([model_name, forecast_values_one_model])
-        else:
-            logger.debug(f"forecast {model_name} is older than 6 hours, so not using it ({one_forecast_created=}")
-
-    if len(forecast_values_all_model_valid) == 0:
-        # use all forecast:
-        logger.debug("using all forecasts as all are older than 6 hours")
-        forecast_values_all_model_valid = forecast_values_all_model
-    
-    return forecast_values_all_model_valid
-
-
 def convert_list_forecast_values_to_df(
     forecast_values_all_model_valid: list[tuple[str, list[ForecastValue]]]
 ) -> pd.DataFrame:
@@ -87,9 +43,9 @@ def convert_list_forecast_values_to_df(
             [
                 value.target_time,
                 value.expected_power_generation_megawatts,
-                value.adjust_mw,
-                value.created_utc,
-                value.properties,
+                getattr(value, "_adjust_mw", getattr(value, "adjust_mw", 0)),
+                getattr(value, "created_utc", None),
+                getattr(value, "_properties", getattr(value, "properties", None)),
                 model_name,
             ]
             for value in forecast_values_one_model

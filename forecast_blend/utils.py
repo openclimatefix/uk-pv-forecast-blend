@@ -43,9 +43,9 @@ def convert_list_forecast_values_to_df(
             [
                 value.target_time,
                 value.expected_power_generation_megawatts,
-                getattr(value, "_adjust_mw", getattr(value, "adjust_mw", 0)),
-                getattr(value, "created_utc", None),
-                getattr(value, "_properties", getattr(value, "properties", None)),
+                value.adjust_mw,
+                value.created_utc,
+                value.properties,
                 model_name,
             ]
             for value in forecast_values_one_model

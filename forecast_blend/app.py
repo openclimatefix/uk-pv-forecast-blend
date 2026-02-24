@@ -37,7 +37,7 @@ from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from forecast_blend.blend import get_blend_forecast_values_latest
-from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values
+from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values, read_from_data_platform, get_data_platform_connection
 from forecast_blend.weights import (
     ALL_MODEL_NAMES,
     backfill_weights, 
@@ -100,6 +100,16 @@ async def app(gsps: list[int] | None = None) -> None:
         # This is not quite right as the forecast could have been made with an earlier version,
         # but I think its the best we can do right now
 
+        # Fetch GSP UUID map once if reading from data platform
+        gsp_uuid_map = None
+        dp_client = None
+        dp_channel = None
+        if read_from_data_platform():
+            host, port = get_data_platform_connection()
+            dp_channel = Channel(host=host, port=port)
+            dp_client = dp.DataPlatformDataServiceStub(dp_channel)
+            gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
+
         forecasts = []
         forecast_values_by_gsp_id = {}
         for gsp_id in gsps:
@@ -114,6 +124,8 @@ async def app(gsps: list[int] | None = None) -> None:
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,
                     weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
+                    gsp_uuid_map=gsp_uuid_map,
+                    dp_client=dp_client,
                 )
                 forecast_values_by_gsp_id[gsp_id] = forecast_values_df
   
@@ -130,6 +142,10 @@ async def app(gsps: list[int] | None = None) -> None:
             except Exception as e:
                 logger.exception(f"Failed to blend forecasts for gsp_id {gsp_id}")
                 logger.debug(f"Exception: {e}")
+
+        # Close data platform channel if it was opened
+        if dp_channel is not None:
+            dp_channel.close()
 
         # 3. save to database
         # save to forecast_value_latest table, and not to the

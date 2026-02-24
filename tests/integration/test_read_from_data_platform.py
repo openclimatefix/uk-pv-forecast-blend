@@ -334,8 +334,8 @@ async def test_blend_forecasts_from_data_platform(
     assert len(xg_forecast) == 8, f"Expected 8 xg values, got {len(xg_forecast)}"
 
     # Verify the values are different (confirming we got data from different models)
-    pvnet_first_value = pvnet_forecast[0].expected_power_generation_megawatts
-    xg_first_value = xg_forecast[0].expected_power_generation_megawatts
+    pvnet_first_value = pvnet_forecast["expected_power_generation_megawatts"].iloc[0]
+    xg_first_value = xg_forecast["expected_power_generation_megawatts"].iloc[0]
 
     # The values should be different since we created different forecasts
     assert pvnet_first_value != xg_first_value, "Forecasts should have different values"

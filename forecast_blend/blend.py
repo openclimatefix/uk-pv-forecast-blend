@@ -12,7 +12,6 @@ from loguru import logger
 
 import pandas as pd
 from nowcasting_datamodel.read.read import get_forecast_values_latest
-from nowcasting_datamodel.models import ForecastValue
 from sqlalchemy.orm.session import Session
 
 from forecast_blend.save import fetch_dp_gsp_uuid_map
@@ -82,10 +81,14 @@ async def _fetch_dp_forecast_values(
         # Ensure start_datetime is timezone-aware for comparison
         if start_datetime.tzinfo is None:
             start_datetime = start_datetime.replace(tzinfo=timezone.utc)
-        forecast_values = [
-            v for v in forecast_values
-            if (v.target_timestamp_utc.replace(tzinfo=timezone.utc) if v.target_timestamp_utc.tzinfo is None else v.target_timestamp_utc) >= start_datetime
-        ]
+        filtered_values = []
+        for v in forecast_values:
+            target_time = v.target_timestamp_utc
+            if target_time.tzinfo is None:
+                target_time = target_time.replace(tzinfo=timezone.utc)
+            if target_time >= start_datetime:
+                filtered_values.append(v)
+        forecast_values = filtered_values
     
     return forecast_values
 
@@ -111,9 +114,19 @@ async def _get_forecast_values_from_data_platform(
     location_uuid: str,
     model_name: str,
     start_datetime: datetime | None,
-):
-
-    """Get forecast values from Data Platform."""
+) -> pd.DataFrame:
+    """Get forecast values from Data Platform.
+    
+    Args:
+        client: Data Platform client
+        location_uuid: Location UUID
+        model_name: Model/forecaster name
+        start_datetime: Optional start datetime filter
+        
+    Returns:
+        DataFrame with columns: target_time, expected_power_generation_megawatts,
+        adjust_mw, created_utc, properties, model_name
+    """
     logger.debug(
         f"Getting forecast values from Data Platform for location {location_uuid}, "
         f"model {model_name}, start_datetime {start_datetime}"
@@ -124,30 +137,41 @@ async def _get_forecast_values_from_data_platform(
         location_uuid=location_uuid,
         model_name=model_name,
         start_datetime=start_datetime,
-)
+    )
 
+    if not dp_values:
+        logger.debug(f"No forecast values from Data Platform for model {model_name}")
+        return pd.DataFrame(columns=[
+            "target_time",
+            "expected_power_generation_megawatts",
+            "adjust_mw",
+            "created_utc",
+            "properties",
+            "model_name",
+        ])
 
-    # Convert Data Platform forecast values to ForecastValue objects
-    forecast_values = []
+    # Convert Data Platform forecast values directly to DataFrame rows
+    rows = []
+    now = datetime.now(timezone.utc)
     for dp_value in dp_values:
-        # Convert from Data Platform format to nowcasting_datamodel format
-        # Note: adjust_mw might not be available in DP, defaulting to 0
         properties = {}
         if hasattr(dp_value, 'plevel_10') and dp_value.plevel_10:
             properties['10'] = dp_value.plevel_10
         if hasattr(dp_value, 'plevel_90') and dp_value.plevel_90:
             properties['90'] = dp_value.plevel_90
-            
-        fv = ForecastValue(
-            target_time=dp_value.target_timestamp_utc,
-            expected_power_generation_megawatts = dp_value.p50_value_fraction * dp_value.effective_capacity_watts/ 1_000_000,
-        )
-        fv._adjust_mw = 0  # adjust_mw is not provided by DP, setting to 0
-        fv._properties = properties
-        forecast_values.append(fv)
 
-    logger.debug(f"Converted {len(forecast_values)} forecast values from Data Platform")
-    return forecast_values
+        rows.append({
+            "target_time": dp_value.target_timestamp_utc,
+            "expected_power_generation_megawatts": dp_value.p50_value_fraction * dp_value.effective_capacity_watts / 1_000_000,
+            "adjust_mw": 0,  # adjust_mw is not provided by DP
+            "created_utc": now,
+            "properties": properties,
+            "model_name": model_name,
+        })
+
+    df = pd.DataFrame(rows)
+    logger.debug(f"Converted {len(df)} forecast values from Data Platform")
+    return df
 
 
 async def get_blend_forecast_values_latest(
@@ -155,6 +179,8 @@ async def get_blend_forecast_values_latest(
     gsp_id: int,
     weights_df: pd.DataFrame,
     start_datetime: datetime | None = None,
+    gsp_uuid_map: dict | None = None,
+    dp_client: dp.DataPlatformDataServiceStub | None = None,
 ) -> pd.DataFrame:
     """
     Get forecast values
@@ -165,6 +191,8 @@ async def get_blend_forecast_values_latest(
         see structure in weights.py - get_national_blend_weights
     :param start_datetime: optional to filterer target_time by start_datetime
         If None is given then all are returned.
+    :param gsp_uuid_map: optional pre-fetched GSP UUID map from Data Platform
+    :param dp_client: optional pre-created Data Platform client
 
     return: DataFrame of blended forecast values, with the following columns
             - target_datetime_utc
@@ -181,20 +209,27 @@ async def get_blend_forecast_values_latest(
     model_names = weights_df.columns
 
     # get forecast for the different models
-    forecast_values_all_model = []
+    forecast_values_all_model_dfs = []
     if read_from_data_platform():
 
-        host, port = get_data_platform_connection()
+        # Use passed-in client and map, or create new ones if not provided
+        client = dp_client
+        local_channel = None
+        if client is None:
+            host, port = get_data_platform_connection()
+            local_channel = Channel(host=host, port=port)
+            client = dp.DataPlatformDataServiceStub(local_channel)
 
-        async with Channel(host=host, port=port) as channel:
-            client = dp.DataPlatformDataServiceStub(channel)
+        try:
+            # Use passed-in map or fetch it
+            uuid_map = gsp_uuid_map
+            if uuid_map is None:
+                uuid_map = await fetch_dp_gsp_uuid_map(client)
 
-            gsp_uuid_map = await fetch_dp_gsp_uuid_map(client)
-
-            if gsp_id not in gsp_uuid_map:
+            if gsp_id not in uuid_map:
                 raise ValueError(f"GSP {gsp_id} not found in Data Platform")
 
-            location_uuid = gsp_uuid_map[gsp_id]["location_uuid"]
+            location_uuid = uuid_map[gsp_id]["location_uuid"]
 
             tasks = [
                 _get_forecast_values_from_data_platform(
@@ -208,18 +243,31 @@ async def get_blend_forecast_values_latest(
 
             results = await asyncio.gather(*tasks)
 
-            for model_name, forecast_values_one_model in zip(model_names, results):
-                if len(forecast_values_one_model) > 0:
-                    forecast_values_all_model.append(
-                        [model_name, forecast_values_one_model]
-                    )
+            # Results are DataFrames, collect non-empty ones
+            for df in results:
+                if len(df) > 0:
+                    forecast_values_all_model_dfs.append(df)
                 else:
+                    model_name = df["model_name"].iloc[0] if len(df) > 0 else "unknown"
                     logger.debug(
                         f"No forecast values for {model_name} "
                         f"for gsp_id {gsp_id}"
                     )
+        finally:
+            # Close the channel only if we created it locally
+            if local_channel is not None:
+                local_channel.close()
+
+        # Concatenate all DataFrames
+        if forecast_values_all_model_dfs:
+            forecast_values_all_model = pd.concat(forecast_values_all_model_dfs, axis=0)
+            forecast_values_all_model.reset_index(inplace=True, drop=True)
+            forecast_values_all_model.sort_values(by=["target_time"], inplace=True)
+        else:
+            forecast_values_all_model = pd.DataFrame()
 
     else:
+        forecast_values_all_model_list = []
         for model_name in model_names:
             forecast_values_one_model = _get_forecast_values_from_db(
                 session=session,
@@ -229,7 +277,7 @@ async def get_blend_forecast_values_latest(
             )
 
             if len(forecast_values_one_model) > 0:
-                forecast_values_all_model.append(
+                forecast_values_all_model_list.append(
                     [model_name, forecast_values_one_model]
                 )
             else:
@@ -238,8 +286,8 @@ async def get_blend_forecast_values_latest(
                     f"for gsp_id {gsp_id}"
                 )
 
-    # make into dataframe
-    forecast_values_all_model = convert_list_forecast_values_to_df(forecast_values_all_model)
+        # make into dataframe
+        forecast_values_all_model = convert_list_forecast_values_to_df(forecast_values_all_model_list)
 
     # blend together
     forecast_values_blended = blend_forecasts_together(forecast_values_all_model, weights_df)

@@ -19,9 +19,10 @@ import pytest_asyncio
 from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
 from importlib.metadata import version
-from forecast_blend.blend import (
-    _fetch_dp_forecast_values,
-    _get_forecast_values_from_data_platform,
+
+from forecast_blend.forecast.data_platform import (
+    fetch_dp_forecast_values,
+    get_forecast_values_from_data_platform
 )
 from forecast_blend.weights import _fetch_latest_forecast_metadata_from_dp
 
@@ -253,7 +254,7 @@ async def test_read_forecast_values_from_data_platform(
 
     # Then fetch forecast values
     start_datetime = init_time.replace(tzinfo=None)
-    values = await _fetch_dp_forecast_values(
+    values = await fetch_dp_forecast_values(
         client=client,
         location_uuid=location_uuid,
         model_name="pvnet_day_ahead",
@@ -313,14 +314,14 @@ async def test_blend_forecasts_from_data_platform(
     )
 
     # Get forecasts for both models
-    pvnet_forecast = await _get_forecast_values_from_data_platform(
+    pvnet_forecast = await get_forecast_values_from_data_platform(
         client=client,
         location_uuid=test_data["locations"][0]["uuid"],
         model_name="pvnet_day_ahead",
         start_datetime=init_time.replace(tzinfo=None),
     )
 
-    xg_forecast = await _get_forecast_values_from_data_platform(
+    xg_forecast = await get_forecast_values_from_data_platform(
         client=client,
         location_uuid=test_data["locations"][0]["uuid"],
         model_name="national_xg",
@@ -351,7 +352,7 @@ async def test_read_with_no_forecasts_returns_empty(
     test_data = setup_test_data
 
     # Try to fetch forecasts for a model that doesn't exist
-    values = await _fetch_dp_forecast_values(
+    values = await fetch_dp_forecast_values(
         client=dp_client[0],
         location_uuid=test_data["locations"][0]["uuid"],
         model_name="nonexistent_model",

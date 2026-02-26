@@ -141,7 +141,11 @@ async def get_forecast_values_from_data_platform(
                 "expected_power_generation_megawatts": dp_value.p50_value_fraction
                 * dp_value.effective_capacity_watts
                 / 1_000_000,
-                "adjust_mw": 0,  # adjust_mw is not provided by DP
+                # TODO: load adjuster values from the Data Platform
+                # using the model "{model_name}_adjust". This should only apply for
+                # national forecasts (gsp_id == 0).
+                # Currently adjust_mw is set to 0 because DP does not return it directly.
+                "adjust_mw": 0, 
                 "created_utc": now,
                 "properties": properties,
                 "model_name": model_name,

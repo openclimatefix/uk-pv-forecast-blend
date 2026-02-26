@@ -17,16 +17,17 @@ from forecast_blend.save import fetch_dp_gsp_uuid_map
 from forecast_blend.utils import (
     blend_forecasts_together,
     convert_list_forecast_values_to_df,
-    get_data_platform_connection,
-    read_from_data_platform,
 )
 
-from forecast_blend.forecast.data_platform import get_forecast_values_from_data_platform
+from forecast_blend.forecast.data_platform import (
+    get_forecast_values_from_data_platform, 
+    read_from_data_platform, 
+    get_data_platform_connection,
+)
 from forecast_blend.forecast.database import get_forecast_values_from_db
 
 from grpclib.client import Channel
 from dp_sdk.ocf import dp
-
 
 
 async def get_blend_forecast_values_latest(

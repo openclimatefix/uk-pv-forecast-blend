@@ -1,5 +1,4 @@
 """Utils for blending forecasts together"""
-import os
 from datetime import datetime, timedelta, timezone
 from loguru import logger
 
@@ -7,18 +6,6 @@ import numpy as np
 import pandas as pd
 from nowcasting_datamodel.models import ForecastValue
 
-
-def read_from_data_platform() -> bool:
-    """Check if we should read from Data Platform instead of database."""
-    result = os.getenv("READ_FROM_DATA_PLATFORM", "false").lower() == "true"
-    return result
-
-
-def get_data_platform_connection() -> tuple[str, int]:
-    """Get the Data Platform host and port from environment variables."""
-    host = os.getenv("DATA_PLATFORM_HOST", "localhost")
-    port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
-    return host, port
 
 def convert_list_forecast_values_to_df(
     forecast_values_all_model_valid: list[tuple[str, list[ForecastValue]]]

@@ -1,10 +1,21 @@
 """data platform interactions for forecasts."""
-
+import os
 from datetime import datetime, timedelta, timezone
 import pandas as pd
 from loguru import logger
 from dp_sdk.ocf import dp
 
+def read_from_data_platform() -> bool:
+    """Check if we should read from Data Platform instead of database."""
+    result = os.getenv("READ_FROM_DATA_PLATFORM", "false").lower() == "true"
+    return result
+
+
+def get_data_platform_connection() -> tuple[str, int]:
+    """Get the Data Platform host and port from environment variables."""
+    host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+    port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
+    return host, port
 
 async def fetch_dp_forecast_values(
     client: dp.DataPlatformDataServiceStub,

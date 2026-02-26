@@ -14,7 +14,7 @@ from dp_sdk.ocf import dp
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
 
-from forecast_blend.utils import get_data_platform_connection, read_from_data_platform
+from forecast_blend.forecast.data_platform import read_from_data_platform, get_data_platform_connection
 
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]

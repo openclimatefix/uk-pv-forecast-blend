@@ -37,7 +37,7 @@ from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from forecast_blend.blend import get_blend_forecast_values_latest
-from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values, read_from_data_platform, get_data_platform_connection
+from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values
 from forecast_blend.weights import (
     ALL_MODEL_NAMES,
     backfill_weights, 
@@ -45,6 +45,7 @@ from forecast_blend.weights import (
     get_regional_blend_weights,
 )
 from forecast_blend.save import fetch_dp_gsp_uuid_map, save_forecast_to_data_platform
+from forecast_blend.forecast.data_platform import read_from_data_platform, get_data_platform_connection
 import pandas as pd
 
 __version__ = "1.1.9"

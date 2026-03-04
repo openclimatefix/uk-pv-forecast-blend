@@ -9,6 +9,7 @@ from grpclib.client import Channel
 import pytest_asyncio
 from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
+from importlib.metadata import version
 
 from forecast_blend.save import save_forecast_to_data_platform
 
@@ -24,7 +25,7 @@ def client():
     # we use a specific postgres image with postgis and pgpartman installed
     # TODO make a release of this, not using logging tag.
     with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:logging",
+        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
         username="postgres",
         password="postgres",  #noqa: S106
         dbname="postgres",
@@ -38,7 +39,7 @@ def client():
         database_url = database_url.replace("localhost", "host.docker.internal")
 
         with DockerContainer(
-            image="ghcr.io/openclimatefix/data-platform:0.11.0",
+            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
             env={"DATABASE_URL": database_url},
             ports=[50051],
         ) as data_platform_server:

@@ -37,7 +37,7 @@ from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from forecast_blend.blend import get_blend_forecast_values_latest
-from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values
+from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values, format_metadata
 from forecast_blend.weights import (
     ALL_MODEL_NAMES,
     backfill_weights, 
@@ -102,6 +102,7 @@ async def app(gsps: list[int] | None = None) -> None:
 
         forecasts = []
         forecast_values_by_gsp_id = {}
+        metadata = None
         for gsp_id in gsps:
             logger.info(f"Blending forecasts for gsp id {gsp_id}")
             try:
@@ -157,12 +158,17 @@ async def app(gsps: list[int] | None = None) -> None:
                 update_gsp=True,
             )
 
+        if gsp_id == 0:
+            # In future we will want to get the metadata from the data-platform
+            metadata = format_metadata(**forecasts[0].input_data_last_updated)
+
     # save to dataplatform
     logger.info("Saving forecast to data platform")
     channel = Channel(
         os.getenv("DATA_PLATFORM_HOST", "localhost"),
         int(os.getenv("DATA_PLATFORM_PORT", "50051")),
     )
+
     client = dp.DataPlatformDataServiceStub(channel)
     try:
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
@@ -171,9 +177,9 @@ async def app(gsps: list[int] | None = None) -> None:
             locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
             model_tag=blend_name,
             init_time_utc=t0.to_pydatetime(),
-            client=client
+            client=client,
+            metadata=metadata,
             )
-
     except Exception as e:
         logger.error(f"Failed to save forecast to data platform with error {e}")
     finally:

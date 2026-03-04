@@ -158,9 +158,7 @@ async def app(gsps: list[int] | None = None) -> None:
                 update_gsp=True,
             )
 
-        if gsp_id == 0:
-            # In future we will want to get the metadata from the data-platform
-            metadata = format_metadata(forecasts[0].input_data_last_updated)
+        metadata = format_metadata(forecasts[0].input_data_last_updated)
 
     # save to dataplatform
     logger.info("Saving forecast to data platform")

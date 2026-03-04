@@ -132,14 +132,14 @@ wheels = [
 
 [[package]]
 name = "dp-sdk"
-version = "0.16.0"
-source = { url = "https://github.com/openclimatefix/data-platform/releases/download/v0.16.0/dp_sdk-0.16.0-py3-none-any.whl" }
+version = "0.21.2"
+source = { url = "https://github.com/openclimatefix/data-platform/releases/download/v0.21.2/dp_sdk-0.21.2-py3-none-any.whl" }
 dependencies = [
     { name = "betterproto" },
     { name = "grpcio" },
 ]
 wheels = [
-    { url = "https://github.com/openclimatefix/data-platform/releases/download/v0.16.0/dp_sdk-0.16.0-py3-none-any.whl", hash = "sha256:4494a160fc3e59e6c6d5df26f6433c7a77754851a3748b51e79bc76de358c470" },
+    { url = "https://github.com/openclimatefix/data-platform/releases/download/v0.21.2/dp_sdk-0.21.2-py3-none-any.whl", hash = "sha256:de184a95364f0dd4f2fbf99dc14c62c1006573a011e02c8aba00f890c2db77ba" },
 ]
 
 [package.metadata]
@@ -738,7 +738,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "betterproto", specifier = "==2.0.0b7" },
-    { name = "dp-sdk", url = "https://github.com/openclimatefix/data-platform/releases/download/v0.16.0/dp_sdk-0.16.0-py3-none-any.whl" },
+    { name = "dp-sdk", url = "https://github.com/openclimatefix/data-platform/releases/download/v0.21.2/dp_sdk-0.21.2-py3-none-any.whl" },
     { name = "freezegun" },
     { name = "grpclib", specifier = "==0.4.8" },
     { name = "loguru", specifier = "==0.7.3" },

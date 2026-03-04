@@ -44,7 +44,7 @@ async def dp_client():
     Fixture to spin up a PostgreSQL container and Data Platform for reading tests.
     """
     with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:logging",
+        "ghcr.io/openclimatefix/data-platform-pgdb:0.21.2",
         username="postgres",
         password="postgres",  # noqa: S106
         dbname="postgres",

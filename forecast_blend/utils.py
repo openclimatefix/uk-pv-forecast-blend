@@ -2,9 +2,12 @@
 from datetime import datetime, timedelta, timezone
 from loguru import logger
 
+from betterproto.lib.google.protobuf import Struct, Value
+
 import numpy as np
 import pandas as pd
-from nowcasting_datamodel.models import ForecastValue
+from nowcasting_datamodel.models import ForecastValue, InputDataLastUpdatedSQL
+from importlib.metadata import version
 
 
 def convert_list_forecast_values_to_df(
@@ -314,3 +317,22 @@ def get_start_datetime() -> datetime:
         start_datetime = start_datetime + timedelta(hours=1)
 
     return start_datetime
+
+
+def format_metadata(input_data: InputDataLastUpdatedSQL) -> Struct:
+    """
+    Format the metadata for the forecast.
+
+    :param input_data: The input data to format
+    :return: The formatted metadata
+    """
+    app_version = version("uk-pv-forecast-blend")
+
+    metadata = {}
+    metadata["app_version"] = Value(string_value=app_version)
+    metadata["gsp_last_updated"] = Value(string_value=input_data.gsp.isoformat())
+    metadata["satellite_last_updated"] = Value(string_value=input_data.satellite.isoformat())
+    metadata["nwp_last_updated"] = Value(string_value=input_data.nwp.isoformat())
+    
+    metadata = Struct(fields=metadata)
+    return metadata

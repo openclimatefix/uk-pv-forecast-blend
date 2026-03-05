@@ -4,7 +4,6 @@ import asyncio
 import itertools
 import logging
 from datetime import UTC, datetime
-from importlib.metadata import version
 
 import betterproto
 import pandas as pd
@@ -20,6 +19,7 @@ async def save_forecast_to_data_platform(
     model_tag: str,
     init_time_utc: datetime,
     client: dp.DataPlatformDataServiceStub,
+    metadata: None | Struct = None
 ) -> None:
     """Save forecast DataArray to data platform.
 
@@ -61,6 +61,7 @@ async def save_forecast_to_data_platform(
             energy_source=dp.EnergySource.SOLAR,
             init_time_utc=init_time_utc.replace(tzinfo=UTC),
             values=forecast_values,
+            metadata=metadata
         )
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
@@ -80,6 +81,7 @@ async def save_forecast_to_data_platform(
                 energy_source=dp.EnergySource.SOLAR,
                 init_time_utc=init_time_utc.replace(tzinfo=UTC),
                 values=forecast_values,
+                metadata=metadata
             )
             tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
@@ -209,7 +211,7 @@ async def create_forecaster_if_not_exists(
 ) -> dp.Forecaster:
     """Create the current forecaster if it does not exist."""
     name = model_tag.replace("-", "_")
-    app_version = version("uk-pv-forecast-blend")
+    version = "1.3.0"
 
     list_forecasters_request = dp.ListForecastersRequest(
         forecaster_names_filter=[name],
@@ -218,7 +220,7 @@ async def create_forecaster_if_not_exists(
 
     if len(list_forecasters_response.forecasters) > 0:
         filtered_forecasters = [
-            f for f in list_forecasters_response.forecasters if f.forecaster_version == app_version
+            f for f in list_forecasters_response.forecasters if f.forecaster_version == version
         ]
         if len(filtered_forecasters) == 1:
             # Forecaster exists, return it
@@ -227,7 +229,7 @@ async def create_forecaster_if_not_exists(
             # Forecaster version does not exist, update it
             update_forecaster_request = dp.UpdateForecasterRequest(
                 name=name,
-                new_version=app_version,
+                new_version=version,
             )
             update_forecaster_response = await client.update_forecaster(update_forecaster_request)
             return update_forecaster_response.forecaster
@@ -235,7 +237,7 @@ async def create_forecaster_if_not_exists(
         # Forecaster does not exist, create it
         create_forecaster_request = dp.CreateForecasterRequest(
             name=name,
-            version=app_version,
+            version=version,
         )
         create_forecaster_response = await client.create_forecaster(create_forecaster_request)
         return create_forecaster_response.forecaster

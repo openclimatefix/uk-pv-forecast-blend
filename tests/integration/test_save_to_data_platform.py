@@ -10,6 +10,7 @@ import pytest_asyncio
 from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
 from importlib.metadata import version
+
 from forecast_blend.save import save_forecast_to_data_platform
 
 
@@ -24,7 +25,7 @@ def client():
     # we use a specific postgres image with postgis and pgpartman installed
     # TODO make a release of this, not using logging tag.
     with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:0.21.2",
+        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
         username="postgres",
         password="postgres",  #noqa: S106
         dbname="postgres",
@@ -96,6 +97,7 @@ async def test_save_to_generation_to_data_platform(client):
         client=client,
         model_tag="test_model",
         init_time_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
+        metadata=Struct(fields={"test_key": Value(string_value="test_value")})
     )
 
     # check: read from the data platform to check it was saved
@@ -114,6 +116,7 @@ async def test_save_to_generation_to_data_platform(client):
     assert len(get_latest_forecasts_response.forecasts) == 2
     forecast = get_latest_forecasts_response.forecasts[0]
     assert forecast.forecaster.forecaster_name == "test_model"
+    assert forecast.metadata.fields["test_key"].string_value == "test_value"
     forecast_adjust = get_latest_forecasts_response.forecasts[1]
     assert forecast_adjust.forecaster.forecaster_name == "test_model_adjust"
 

@@ -5,27 +5,38 @@
 
 """
 
+import asyncio
 import json
 from datetime import datetime
 from loguru import logger
 
 import pandas as pd
-from nowcasting_datamodel.read.read import get_forecast_values_latest
-
 from sqlalchemy.orm.session import Session
 
+from forecast_blend.save import fetch_dp_gsp_uuid_map
 from forecast_blend.utils import (
     blend_forecasts_together,
     convert_list_forecast_values_to_df,
 )
 
+from forecast_blend.forecast.data_platform import (
+    get_forecast_values_from_data_platform, 
+    read_from_data_platform, 
+    get_data_platform_connection,
+)
+from forecast_blend.forecast.database import get_forecast_values_from_db
+
+from grpclib.client import Channel
+from dp_sdk.ocf import dp
 
 
-def get_blend_forecast_values_latest(
+async def get_blend_forecast_values_latest(
     session: Session,
     gsp_id: int,
     weights_df: pd.DataFrame,
     start_datetime: datetime | None = None,
+    gsp_uuid_map: dict | None = None,
+    dp_client: dp.DataPlatformDataServiceStub | None = None,
 ) -> pd.DataFrame:
     """
     Get forecast values
@@ -36,6 +47,8 @@ def get_blend_forecast_values_latest(
         see structure in weights.py - get_national_blend_weights
     :param start_datetime: optional to filterer target_time by start_datetime
         If None is given then all are returned.
+    :param gsp_uuid_map: optional pre-fetched GSP UUID map from Data Platform
+    :param dp_client: optional pre-created Data Platform client
 
     return: DataFrame of blended forecast values, with the following columns
             - target_datetime_utc
@@ -52,31 +65,85 @@ def get_blend_forecast_values_latest(
     model_names = weights_df.columns
 
     # get forecast for the different models
-    forecast_values_all_model = []
-    for model_name in model_names:
-        forecast_values_one_model = get_forecast_values_latest(
-            session=session,
-            gsp_id=gsp_id,
-            start_datetime=start_datetime,
-            model_name=model_name,
-        )
+    forecast_values_all_model_dfs = []
+    if read_from_data_platform():
 
+        # Use passed-in client and map, or create new ones if not provided
+        client = dp_client
+        local_channel = None
+        if client is None:
+            host, port = get_data_platform_connection()
+            local_channel = Channel(host=host, port=port)
+            client = dp.DataPlatformDataServiceStub(local_channel)
 
-        if len(forecast_values_one_model) == 0:
-            logger.debug(
-                f"No forecast values for {model_name} for gsp_id {gsp_id} "
-                f"and start_datetime {start_datetime}"
-            )
+        try:
+            # Use passed-in map or fetch it
+            uuid_map = gsp_uuid_map
+            if uuid_map is None:
+                uuid_map = await fetch_dp_gsp_uuid_map(client)
+
+            if gsp_id not in uuid_map:
+                raise ValueError(f"GSP {gsp_id} not found in Data Platform")
+
+            location_uuid = uuid_map[gsp_id]["location_uuid"]
+
+            tasks = [
+                get_forecast_values_from_data_platform(
+                    client=client,
+                    location_uuid=location_uuid,
+                    model_name=model_name,
+                    start_datetime=start_datetime,
+                )
+                for model_name in model_names
+            ]
+
+            results = await asyncio.gather(*tasks)
+
+            # Results are DataFrames, collect non-empty ones
+            for df in results:
+                if len(df) > 0:
+                    forecast_values_all_model_dfs.append(df)
+                else:
+                    model_name = df["model_name"].iloc[0] if len(df) > 0 else "unknown"
+                    logger.debug(
+                        f"No forecast values for {model_name} "
+                        f"for gsp_id {gsp_id}"
+                    )
+        finally:
+            # Close the channel only if we created it locally
+            if local_channel is not None:
+                local_channel.close()
+
+        # Concatenate all DataFrames
+        if forecast_values_all_model_dfs:
+            forecast_values_all_model = pd.concat(forecast_values_all_model_dfs, axis=0)
+            forecast_values_all_model.reset_index(inplace=True, drop=True)
+            forecast_values_all_model.sort_values(by=["target_time"], inplace=True)
         else:
-            logger.debug(
-                f"Found {len(forecast_values_one_model)} values for {model_name} "
-                f"for gsp_id {gsp_id} and start_datetime {start_datetime}. "
-                f"First value is {forecast_values_one_model[0].target_time}"
-            )
-            forecast_values_all_model.append([model_name, forecast_values_one_model])
+            forecast_values_all_model = pd.DataFrame()
 
-    # make into dataframe
-    forecast_values_all_model = convert_list_forecast_values_to_df(forecast_values_all_model)
+    else:
+        forecast_values_all_model_list = []
+        for model_name in model_names:
+            forecast_values_one_model = get_forecast_values_from_db(
+                session=session,
+                gsp_id=gsp_id,
+                start_datetime=start_datetime,
+                model_name=model_name,
+            )
+
+            if len(forecast_values_one_model) > 0:
+                forecast_values_all_model_list.append(
+                    [model_name, forecast_values_one_model]
+                )
+            else:
+                logger.debug(
+                    f"No forecast values for {model_name} "
+                    f"for gsp_id {gsp_id}"
+                )
+
+        # make into dataframe
+        forecast_values_all_model = convert_list_forecast_values_to_df(forecast_values_all_model_list)
 
     # blend together
     forecast_values_blended = blend_forecasts_together(forecast_values_all_model, weights_df)

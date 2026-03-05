@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 import pandas as pd
+import pytest
 from forecast_blend.blend import get_blend_forecast_values_latest
 from forecast_blend.utils import convert_df_to_list_forecast_values 
 import time_machine
@@ -10,7 +11,8 @@ from nowcasting_datamodel.read.read_models import get_model
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_blend_forecast_values_latest_one_model(db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_blend_forecast_values_latest_one_model(db_session):
     model = get_model(session=db_session, name="test_1", version="0.0.1")
 
     weights_df = pd.DataFrame(
@@ -46,7 +48,7 @@ def test_get_blend_forecast_values_latest_one_model(db_session):
     db_session.add_all(f1)
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 2
 
-    forecast_values_read = get_blend_forecast_values_latest(
+    forecast_values_read = await get_blend_forecast_values_latest(
         session=db_session,
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
@@ -67,7 +69,8 @@ def test_get_blend_forecast_values_latest_one_model(db_session):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
 
@@ -106,7 +109,7 @@ def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
         db_session.add_all(f1)
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 4
 
-    forecast_values_read = get_blend_forecast_values_latest(
+    forecast_values_read = await get_blend_forecast_values_latest(
         session=db_session,
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
@@ -127,7 +130,8 @@ def test_get_blend_forecast_values_latest_two_model_read_one(db_session):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
     model_3 = get_model(session=db_session, name="test_2", version="0.0.2")
@@ -190,7 +194,7 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
         )
     )
 
-    forecast_values_read = get_blend_forecast_values_latest(
+    forecast_values_read = await get_blend_forecast_values_latest(
         session=db_session,
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2022, 12, 31, 0, 0, tzinfo=timezone.utc),
@@ -226,7 +230,8 @@ def test_get_blend_forecast_values_latest_two_model_read_two(db_session):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_blend_forecast_values_latest_negative(db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_blend_forecast_values_latest_negative(db_session):
     """This test makes sure that the blend function changes negatives to zeros"""
 
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
@@ -273,7 +278,7 @@ def test_get_blend_forecast_values_latest_negative(db_session):
         db_session.add_all(f1)
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 8
 
-    forecast_values_read = get_blend_forecast_values_latest(
+    forecast_values_read = await get_blend_forecast_values_latest(
         session=db_session,
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
@@ -297,7 +302,8 @@ def test_get_blend_forecast_values_latest_negative(db_session):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_blend_forecast_values_latest_no_properties(db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_blend_forecast_values_latest_no_properties(db_session):
     """This test checks that when there are no _properties, an empty dictionary is returned"""
 
     model_1 = get_model(session=db_session, name="cnn", version="0.0.1")
@@ -333,7 +339,7 @@ def test_get_blend_forecast_values_latest_no_properties(db_session):
 
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 8
 
-    forecast_values_read = get_blend_forecast_values_latest(
+    forecast_values_read = await get_blend_forecast_values_latest(
         session=db_session,
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
@@ -347,7 +353,8 @@ def test_get_blend_forecast_values_latest_no_properties(db_session):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_blend_forecast_values_latest_negative_two(db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_blend_forecast_values_latest_negative_two(db_session):
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
 
@@ -389,7 +396,7 @@ def test_get_blend_forecast_values_latest_negative_two(db_session):
         db_session.add_all(f1)
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 8
 
-    forecast_values_read = get_blend_forecast_values_latest(
+    forecast_values_read = await get_blend_forecast_values_latest(
         session=db_session,
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
@@ -409,7 +416,8 @@ def test_get_blend_forecast_values_latest_negative_two(db_session):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_blend_forecast_three_models(db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_blend_forecast_three_models(db_session):
     model_1 = get_model(session=db_session, name="test_1", version="0.0.1")
     model_2 = get_model(session=db_session, name="test_2", version="0.0.1")
     model_3 = get_model(session=db_session, name="test_3", version="0.0.1")
@@ -467,7 +475,7 @@ def test_get_blend_forecast_three_models(db_session):
     fs = db_session.query(ForecastValueLatestSQL).all()
     assert len(fs) == 16
 
-    forecast_values_read = get_blend_forecast_values_latest(
+    forecast_values_read = await get_blend_forecast_values_latest(
         session=db_session,
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),
@@ -488,7 +496,8 @@ def test_get_blend_forecast_three_models(db_session):
 
 
 @time_machine.travel("2023-01-01 00:00:01")
-def test_get_blend_forecast_three_models_with_gap(db_session):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_get_blend_forecast_three_models_with_gap(db_session):
     """
     The idea of this test its to make a gap in the one of the forecast,
     In this gap we set the weights to load that model.
@@ -552,7 +561,7 @@ def test_get_blend_forecast_three_models_with_gap(db_session):
     fs = db_session.query(ForecastValueLatestSQL).all()
     assert len(fs) == 11
 
-    forecast_values_read = get_blend_forecast_values_latest(
+    forecast_values_read = await get_blend_forecast_values_latest(
         session=db_session,
         gsp_id=f1[0].location.gsp_id,
         start_datetime=datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc),

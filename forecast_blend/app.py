@@ -45,6 +45,7 @@ from forecast_blend.weights import (
     get_regional_blend_weights,
 )
 from forecast_blend.save import fetch_dp_gsp_uuid_map, save_forecast_to_data_platform
+from forecast_blend.forecast.data_platform import read_from_data_platform, get_data_platform_connection
 import pandas as pd
 
 __version__ = "1.1.9"
@@ -86,8 +87,8 @@ async def app(gsps: list[int] | None = None) -> None:
 
         model = get_blend_model(session, blend_name)
 
-        national_weights_df = get_national_blend_weights(session, t0, exclude_models)
-        regional_weights_df = get_regional_blend_weights(session, t0, exclude_models)
+        national_weights_df = await get_national_blend_weights(session, t0, exclude_models)
+        regional_weights_df = await get_regional_blend_weights(session, t0, exclude_models)
 
         national_weights_df = backfill_weights(national_weights_df, start_datetime)
         regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
@@ -100,6 +101,16 @@ async def app(gsps: list[int] | None = None) -> None:
         # This is not quite right as the forecast could have been made with an earlier version,
         # but I think its the best we can do right now
 
+        # Fetch GSP UUID map once if reading from data platform
+        gsp_uuid_map = None
+        dp_client = None
+        dp_channel = None
+        if read_from_data_platform():
+            host, port = get_data_platform_connection()
+            dp_channel = Channel(host=host, port=port)
+            dp_client = dp.DataPlatformDataServiceStub(dp_channel)
+            gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
+
         forecasts = []
         forecast_values_by_gsp_id = {}
         metadata = None
@@ -110,11 +121,13 @@ async def app(gsps: list[int] | None = None) -> None:
                 location = get_location(session=session, gsp_id=gsp_id)
 
                 # 1. and 2. load and blend forecast values together
-                forecast_values_df = get_blend_forecast_values_latest(
+                forecast_values_df = await get_blend_forecast_values_latest(
                     session=session,
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,
                     weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
+                    gsp_uuid_map=gsp_uuid_map,
+                    dp_client=dp_client,
                 )
                 forecast_values_by_gsp_id[gsp_id] = forecast_values_df
   
@@ -131,6 +144,10 @@ async def app(gsps: list[int] | None = None) -> None:
             except Exception as e:
                 logger.exception(f"Failed to blend forecasts for gsp_id {gsp_id}")
                 logger.debug(f"Exception: {e}")
+
+        # Close data platform channel if it was opened
+        if dp_channel is not None:
+            dp_channel.close()
 
         # 3. save to database
         # save to forecast_value_latest table, and not to the
@@ -167,22 +184,23 @@ async def app(gsps: list[int] | None = None) -> None:
         int(os.getenv("DATA_PLATFORM_PORT", "50051")),
     )
 
-    client = dp.DataPlatformDataServiceStub(channel)
-    try:
-        gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
-        _ = await save_forecast_to_data_platform(
-            forecast_values_by_gsp_id=forecast_values_by_gsp_id,
-            locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
-            model_tag=blend_name,
-            init_time_utc=t0.to_pydatetime(),
-            client=client,
-            metadata=metadata,
-            )
-    except Exception as e:
-        logger.error(f"Failed to save forecast to data platform with error {e}")
-    finally:
-        channel.close()
+    async with channel:
+        client = dp.DataPlatformDataServiceStub(channel)
+        try:
+            gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+            _ = await save_forecast_to_data_platform(
+                forecast_values_by_gsp_id=forecast_values_by_gsp_id,
+                locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
+                model_tag=blend_name,
+                init_time_utc=t0.to_pydatetime(),
+                client=client,
+                metadata=metadata,
+                )
 
+        except Exception as e:
+            logger.error(f"Failed to save forecast to data platform with error {e}")
+        finally:
+            channel.close()
 
     logger.info("Finished")
 

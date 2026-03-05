@@ -130,10 +130,14 @@ async def get_forecast_values_from_data_platform(
     now = datetime.now(timezone.utc)
     for dp_value in dp_values:
         properties = {}
-        if hasattr(dp_value, "plevel_10") and dp_value.plevel_10:
-            properties["10"] = dp_value.plevel_10
-        if hasattr(dp_value, "plevel_90") and dp_value.plevel_90:
-            properties["90"] = dp_value.plevel_90
+        # Probabilistic values are stored in other_statistics_fractions dict
+        # They need to be converted from fractions back to MW
+        other_stats = getattr(dp_value, "other_statistics_fractions", {}) or {}
+        capacity_mw = dp_value.effective_capacity_watts / 1_000_000
+        if "p10" in other_stats:
+            properties["10"] = other_stats["p10"] * capacity_mw
+        if "p90" in other_stats:
+            properties["90"] = other_stats["p90"] * capacity_mw
 
         rows.append(
             {

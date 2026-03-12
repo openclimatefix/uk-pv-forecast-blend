@@ -87,6 +87,7 @@ async def get_forecast_values_from_data_platform(
     location_uuid: str,
     model_name: str,
     start_datetime: datetime | None,
+    gsp_id: int = -1,
 ) -> pd.DataFrame:
     """Get forecast values from Data Platform.
 
@@ -95,6 +96,7 @@ async def get_forecast_values_from_data_platform(
         location_uuid: Location UUID
         model_name: Model/forecaster name
         start_datetime: Optional start datetime filter
+        gsp_id: GSP ID (used to determine if adjuster values should be loaded)
 
     Returns:
         DataFrame with columns: target_time, expected_power_generation_megawatts,
@@ -125,6 +127,24 @@ async def get_forecast_values_from_data_platform(
             ]
         )
 
+    # For national forecasts (gsp_id=0), fetch adjuster values to calculate adjust_mw
+    adjuster_values_by_time = {}
+    if gsp_id == 0:
+        adjuster_model_name = f"{model_name}_adjust"
+        adjuster_values = await fetch_dp_forecast_values(
+            client=client,
+            location_uuid=location_uuid,
+            model_name=adjuster_model_name,
+            start_datetime=start_datetime,
+        )
+        for v in adjuster_values:
+            target_time = v.target_timestamp_utc.replace(microsecond=0)
+
+            capacity_mw = v.effective_capacity_watts / 1_000_000
+            adjuster_values_by_time[target_time] = (
+                v.p50_value_fraction * capacity_mw
+            )
+
     # Convert Data Platform forecast values directly to DataFrame rows
     rows = []
     now = datetime.now(timezone.utc)
@@ -134,22 +154,32 @@ async def get_forecast_values_from_data_platform(
         # They need to be converted from fractions back to MW
         other_stats = getattr(dp_value, "other_statistics_fractions", {}) or {}
         capacity_mw = dp_value.effective_capacity_watts / 1_000_000
+        target_time = dp_value.target_timestamp_utc.replace(microsecond=0)
         if "p10" in other_stats:
             properties["10"] = other_stats["p10"] * capacity_mw
         if "p90" in other_stats:
             properties["90"] = other_stats["p90"] * capacity_mw
 
+        main_p50_mw = dp_value.p50_value_fraction * capacity_mw
+
+        # Calculate adjust_mw for national forecasts (gsp_id=0)
+        # adjust_mw = main_forecast - adjuster_forecast
+        adjust_mw = 0.0
+        if gsp_id == 0:
+            adjuster_value = adjuster_values_by_time.get(target_time)
+
+            if adjuster_value is not None:
+                adjust_mw = main_p50_mw - adjuster_value
+            else:
+                logger.warning(
+                    f"No adjuster value found for target_time {target_time} "
+                    f"using model {adjuster_model_name}, defaulting adjust_mw to 0.0"
+                )
         rows.append(
             {
                 "target_time": dp_value.target_timestamp_utc,
-                "expected_power_generation_megawatts": dp_value.p50_value_fraction
-                * dp_value.effective_capacity_watts
-                / 1_000_000,
-                # TODO: load adjuster values from the Data Platform
-                # using the model "{model_name}_adjust". This should only apply for
-                # national forecasts (gsp_id == 0).
-                # Currently adjust_mw is set to 0 because DP does not return it directly.
-                "adjust_mw": 0, 
+                "expected_power_generation_megawatts": main_p50_mw,
+                "adjust_mw": adjust_mw,
                 "created_utc": now,
                 "properties": properties,
                 "model_name": model_name,

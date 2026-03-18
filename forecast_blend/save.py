@@ -58,6 +58,9 @@ async def save_forecast_to_data_platform(
             init_time_utc=init_time_utc,
             capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id]["effective_capacity_watts"],
         )
+        if len(forecast_values) < 2:
+            logger.warning(f"Skipping GSP {gsp_id}: only {len(forecast_values)} forecast values (DP requires ≥2)")
+            continue
         # 4. Save to data platform
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
@@ -78,16 +81,19 @@ async def save_forecast_to_data_platform(
             capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id]["effective_capacity_watts"],
             use_adjuster=True,
         )
-            forecaster_adjust = await create_forecaster_if_not_exists(client=client, model_tag=model_tag+"_adjust")
-            forecast_request = dp.CreateForecastRequest(
-                forecaster=forecaster_adjust,
-                location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id]["location_uuid"],
-                energy_source=dp.EnergySource.SOLAR,
-                init_time_utc=init_time_utc.replace(tzinfo=UTC),
-                values=forecast_values,
-                metadata=metadata
-            )
-            tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
+            if len(forecast_values) < 2:
+                logger.warning(f"Skipping adjusted GSP 0: only {len(forecast_values)} values (DP requires ≥2)")
+            else:
+                forecaster_adjust = await create_forecaster_if_not_exists(client=client, model_tag=model_tag+"_adjust")
+                forecast_request = dp.CreateForecastRequest(
+                    forecaster=forecaster_adjust,
+                    location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id]["location_uuid"],
+                    energy_source=dp.EnergySource.SOLAR,
+                    init_time_utc=init_time_utc.replace(tzinfo=UTC),
+                    values=forecast_values,
+                    metadata=metadata
+                )
+                tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
     logger.info(f"Saving {len(tasks)} forecasts to Data Platform")
     list_results = await asyncio.gather(*tasks, return_exceptions=True)

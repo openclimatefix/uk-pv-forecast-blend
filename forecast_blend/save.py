@@ -44,10 +44,14 @@ async def save_forecast_to_data_platform(
     # 1. get or update or create forecaster version ( this is similar to ml_model before)
     forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag)
 
-    # 2. now loop over all gsps
+    # 2. now loop over all gsps that are registered in the Data Platform
     logger.debug("Processing forecasts for Data Platform")
     tasks = []
-    for gsp_id in forecast_values_by_gsp_id.keys():
+    gsp_ids_to_save = set(forecast_values_by_gsp_id.keys()) & set(locations_uuid_and_capacity_by_gsp_id.keys())
+    unregistered = set(forecast_values_by_gsp_id.keys()) - gsp_ids_to_save
+    if unregistered:
+        logger.warning(f"Skipping {len(unregistered)} GSP IDs not registered in Data Platform: {sorted(unregistered)}")
+    for gsp_id in gsp_ids_to_save:
         # 3. Format the forecast values
         forecast_values = map_values_df_to_dp_requests(
             forecast_values_by_gsp_id[gsp_id],
@@ -127,17 +131,17 @@ def map_values_df_to_dp_requests(
 
     # Reduce singular dimensions
     p50s = forecast_values_df['p50_mw'].values.astype(float)
-    p50s = p50s * 1*10**6 / float(capacity_watts)
-    
+    p50s = (p50s * 1*10**6 / float(capacity_watts)).clip(0, 1)
+
     # add p10s and p90s if they exist
     if 'p10_mw' in forecast_values_df.columns:
-        p10s = forecast_values_df['p10_mw'].values.astype(float) 
-        p10s = p10s * 1*10**6 / float(capacity_watts)
+        p10s = forecast_values_df['p10_mw'].values.astype(float)
+        p10s = (p10s * 1*10**6 / float(capacity_watts)).clip(0, 1)
     else:
         p10s = [None]*len(p50s)
     if 'p90_mw' in forecast_values_df.columns:
         p90s = forecast_values_df['p90_mw'].values.astype(float)
-        p90s = p90s * 1*10**6 / float(capacity_watts)
+        p90s = (p90s * 1*10**6 / float(capacity_watts)).clip(0, 1)
     else:
         p90s = [None]*len(p50s)
 

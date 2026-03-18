@@ -132,7 +132,9 @@ async def app(gsps: list[int] | None = None) -> None:
 
             # make Forecast SQL
             forecast_values = convert_df_to_list_forecast_values(forecast_values_df.copy())
-            assert len(forecast_values) > 0, "No forecast values made"
+            if len(forecast_values) == 0:
+                logger.warning(f"No forecast values produced for gsp_id {gsp_id}, skipping")
+                continue
             forecast = make_forecast(
                 forecast_values=forecast_values,
                 location=location,

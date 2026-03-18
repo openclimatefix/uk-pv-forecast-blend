@@ -54,6 +54,8 @@ def convert_list_forecast_values_to_df(
         value_df.reset_index(inplace=True, drop=False)
         forecast_values_all_model_df.append(value_df)
     # join into one dataframe
+    if not forecast_values_all_model_df:
+        return pd.DataFrame(columns=["target_time", "expected_power_generation_megawatts", "adjust_mw", "created_utc", "properties", "model_name"])
     forecast_values_all_model = pd.concat(forecast_values_all_model_df, axis=0)
     forecast_values_all_model.reset_index(inplace=True)
 

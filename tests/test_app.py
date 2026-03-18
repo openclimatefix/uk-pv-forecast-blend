@@ -34,7 +34,7 @@ def test_is_last_forecast_longer_30_minutes_dont_create(db_session, forecasts):
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-def test_app(db_session, forecasts):
+def test_app(db_session, forecasts, dp_client):
 
     # Check the number forecasts have been made
     # (10 GSPs + 1 National) = 11 forecasts
@@ -59,7 +59,7 @@ def test_app(db_session, forecasts):
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-def test_app_twice(db_session, forecasts):
+def test_app_twice(db_session, forecasts, dp_client):
 
     # Check the number forecasts have been made
     # (10 GSPs + 1 National) = 11 forecasts
@@ -92,7 +92,7 @@ def test_app_twice(db_session, forecasts):
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-def test_app_only_national(db_session, forecast_national):
+def test_app_only_national(db_session, forecast_national, dp_client):
 
     # Check the number forecasts have been made
     # 1 National
@@ -116,7 +116,7 @@ def test_app_only_national(db_session, forecast_national):
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg):
+def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg, dp_client):
     # Check the number forecasts have been made
     # This is for PVnet ecmwf and National_xg only is national
     # 4

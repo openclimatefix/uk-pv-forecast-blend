@@ -8,17 +8,11 @@ These tests verify that:
 """
 
 import datetime
-import time
 
 import pandas as pd
 import pytest
-from betterproto.lib.google.protobuf import Struct, Value
+from betterproto.lib.google.protobuf import Struct
 from dp_sdk.ocf import dp
-from grpclib.client import Channel
-import pytest_asyncio
-from testcontainers.core.container import DockerContainer
-from testcontainers.postgres import PostgresContainer
-from importlib.metadata import version
 
 from forecast_blend.forecast.data_platform import (
     fetch_dp_forecast_values,
@@ -36,92 +30,6 @@ def set_data_platform_env(setup_test_data, monkeypatch):
     monkeypatch.setenv("DATA_PLATFORM_PORT", str(test_data["port"]))
     yield
     # monkeypatch automatically cleans up after test
-
-
-@pytest_asyncio.fixture(scope="module")
-async def dp_client():
-    """
-    Fixture to spin up a PostgreSQL container and Data Platform for reading tests.
-    """
-    with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:0.21.2",
-        username="postgres",
-        password="postgres",  # noqa: S106
-        dbname="postgres",
-        env={"POSTGRES_HOST": "db"},
-    ) as postgres:
-        database_url = postgres.get_connection_url()
-        database_url = database_url.replace("postgresql+psycopg2", "postgres")
-        database_url = database_url.replace("localhost", "host.docker.internal")
-
-        with DockerContainer(
-            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
-            env={"DATABASE_URL": database_url},
-            ports=[50051],
-        ) as data_platform_server:
-            time.sleep(2)  # Give some time for the server to start
-
-            port = data_platform_server.get_exposed_port(50051)
-            host = data_platform_server.get_container_host_ip()
-            channel = Channel(host=host, port=port)
-            client = dp.DataPlatformDataServiceStub(channel)
-            yield client, host, port
-            channel.close()
-
-
-@pytest_asyncio.fixture(scope="module")
-async def setup_test_data(dp_client):
-    """
-    Fixture to set up test locations and forecasters in the Data Platform.
-    Returns the location UUIDs and forecaster info for use in tests.
-    """
-    client, host, port = dp_client
-
-    # Create test location for GSP 0 (national)
-    metadata_gsp0 = Struct(fields={"gsp_id": Value(number_value=0)})
-    create_location_request = dp.CreateLocationRequest(
-        location_name="test_national_gsp",
-        energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POLYGON((-2 52, -1 52, -1 53, -2 53, -2 52))",
-        location_type=dp.LocationType.GSP,
-        effective_capacity_watts=1_000_000_000,  # 1 GW
-        metadata=metadata_gsp0,
-        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-    )
-    response = await client.create_location(create_location_request)
-    location_uuid_gsp0 = response.location_uuid
-
-    # Create test location for GSP 1 (regional)
-    metadata_gsp1 = Struct(fields={"gsp_id": Value(number_value=1)})
-    create_location_request = dp.CreateLocationRequest(
-        location_name="test_regional_gsp_1",
-        energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POLYGON((-3 51, -2 51, -2 52, -3 52, -3 51))",
-        location_type=dp.LocationType.GSP,
-        effective_capacity_watts=100_000_000,  # 100 MW
-        metadata=metadata_gsp1,
-        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-    )
-    response = await client.create_location(create_location_request)
-    location_uuid_gsp1 = response.location_uuid
-
-    # Create forecasters for different models
-    forecasters = {}
-    for model_name in ["pvnet_day_ahead", "national_xg", "pvnet_v2"]:
-        response = await client.create_forecaster(
-            dp.CreateForecasterRequest(name=model_name, version="1.0.0")
-        )
-        forecasters[model_name] = response.forecaster
-
-    return {
-        "host": host,
-        "port": port,
-        "locations": {
-            0: {"uuid": location_uuid_gsp0, "capacity_watts": 1_000_000_000},
-            1: {"uuid": location_uuid_gsp1, "capacity_watts": 100_000_000},
-        },
-        "forecasters": forecasters,
-    }
 
 
 async def create_test_forecast(
@@ -167,15 +75,14 @@ async def create_test_forecast(
     await client.create_forecast(request)
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio(loop_scope="session")
 async def test_read_forecast_metadata_from_data_platform(
-    dp_client, setup_test_data, set_data_platform_env
+    client, setup_test_data, set_data_platform_env
 ):
     """
     Test that forecast metadata can be read from the Data Platform.
     This is used for calculating model delays in weights.py.
     """
-    client, _, _ = dp_client
     test_data = setup_test_data
 
     # Create a forecast for pvnet_day_ahead
@@ -213,14 +120,13 @@ async def test_read_forecast_metadata_from_data_platform(
     assert "pvnet_day_ahead" in df["name"].values
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio(loop_scope="session")
 async def test_read_forecast_values_from_data_platform(
-    dp_client, setup_test_data, set_data_platform_env
+    client, setup_test_data, set_data_platform_env
 ):
     """
     Test that forecast values can be read from the Data Platform.
     """
-    client, _, _ = dp_client
     test_data = setup_test_data
 
     # Create a forecast
@@ -264,14 +170,13 @@ async def test_read_forecast_values_from_data_platform(
     assert len(values) == 8, f"Expected 8 forecast values, got {len(values)}"
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio(loop_scope="session")
 async def test_blend_forecasts_from_data_platform(
-    dp_client, setup_test_data, set_data_platform_env
+    client, setup_test_data, set_data_platform_env
 ):
     """
     Test end-to-end: read multiple model forecasts from Data Platform and blend them.
     """
-    client, _, _ = dp_client
     test_data = setup_test_data
 
     # Create forecasts for two models
@@ -342,9 +247,9 @@ async def test_blend_forecasts_from_data_platform(
     assert pvnet_first_value != xg_first_value, "Forecasts should have different values"
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio(loop_scope="session")
 async def test_read_with_no_forecasts_returns_empty(
-    dp_client, setup_test_data, set_data_platform_env
+    client, setup_test_data, set_data_platform_env
 ):
     """
     Test that reading forecasts for a non-existent model returns empty list.
@@ -353,7 +258,7 @@ async def test_read_with_no_forecasts_returns_empty(
 
     # Try to fetch forecasts for a model that doesn't exist
     values = await fetch_dp_forecast_values(
-        client=dp_client[0],
+        client=client,
         location_uuid=test_data["locations"][0]["uuid"],
         model_name="nonexistent_model",
         start_datetime=datetime.datetime(2025, 1, 1),

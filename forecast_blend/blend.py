@@ -76,11 +76,10 @@ async def get_blend_forecast_values_latest(
             local_channel = Channel(host=host, port=port)
             client = dp.DataPlatformDataServiceStub(local_channel)
 
-        try:
-            # Use passed-in map or fetch it
-            uuid_map = gsp_uuid_map
-            if uuid_map is None:
-                uuid_map = await fetch_dp_gsp_uuid_map(client)
+        # Use passed-in map or fetch it
+        uuid_map = gsp_uuid_map
+        if uuid_map is None:
+            uuid_map = await fetch_dp_gsp_uuid_map(client)
 
             if gsp_id not in uuid_map:
                 raise ValueError(f"GSP {gsp_id} not found in Data Platform")
@@ -109,10 +108,10 @@ async def get_blend_forecast_values_latest(
                         f"No forecast values for {model_name} "
                         f"for gsp_id {gsp_id}"
                     )
-        finally:
-            # Close the channel only if we created it locally
-            if local_channel is not None:
-                local_channel.close()
+
+        # Close the channel only if we created it locally
+        if local_channel is not None:
+            local_channel.close()
 
         # Concatenate all DataFrames
         if forecast_values_all_model_dfs:

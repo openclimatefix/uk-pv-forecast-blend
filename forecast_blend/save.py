@@ -44,16 +44,23 @@ async def save_forecast_to_data_platform(
     # 1. get or update or create forecaster version ( this is similar to ml_model before)
     forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag)
 
-    # 2. now loop over all gsps
+    # 2. now loop over all gsps that are registered in the Data Platform
     logger.debug("Processing forecasts for Data Platform")
     tasks = []
-    for gsp_id in forecast_values_by_gsp_id.keys():
+    gsp_ids_to_save = set(forecast_values_by_gsp_id.keys()) & set(locations_uuid_and_capacity_by_gsp_id.keys())
+    unregistered = set(forecast_values_by_gsp_id.keys()) - gsp_ids_to_save
+    if unregistered:
+        logger.warning(f"Skipping {len(unregistered)} GSP IDs not registered in Data Platform: {sorted(unregistered)}")
+    for gsp_id in gsp_ids_to_save:
         # 3. Format the forecast values
         forecast_values = map_values_df_to_dp_requests(
             forecast_values_by_gsp_id[gsp_id],
             init_time_utc=init_time_utc,
             capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id]["effective_capacity_watts"],
         )
+        if len(forecast_values) < 2:
+            logger.warning(f"Skipping GSP {gsp_id}: only {len(forecast_values)} forecast values (DP requires ≥2)")
+            continue
         # 4. Save to data platform
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
@@ -74,16 +81,19 @@ async def save_forecast_to_data_platform(
             capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id]["effective_capacity_watts"],
             use_adjuster=True,
         )
-            forecaster_adjust = await create_forecaster_if_not_exists(client=client, model_tag=model_tag+"_adjust")
-            forecast_request = dp.CreateForecastRequest(
-                forecaster=forecaster_adjust,
-                location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id]["location_uuid"],
-                energy_source=dp.EnergySource.SOLAR,
-                init_time_utc=init_time_utc.replace(tzinfo=UTC),
-                values=forecast_values,
-                metadata=metadata
-            )
-            tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
+            if len(forecast_values) < 2:
+                logger.warning(f"Skipping adjusted GSP 0: only {len(forecast_values)} values (DP requires ≥2)")
+            else:
+                forecaster_adjust = await create_forecaster_if_not_exists(client=client, model_tag=model_tag+"_adjust")
+                forecast_request = dp.CreateForecastRequest(
+                    forecaster=forecaster_adjust,
+                    location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id]["location_uuid"],
+                    energy_source=dp.EnergySource.SOLAR,
+                    init_time_utc=init_time_utc.replace(tzinfo=UTC),
+                    values=forecast_values,
+                    metadata=metadata
+                )
+                tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
     logger.info(f"Saving {len(tasks)} forecasts to Data Platform")
     list_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -127,17 +137,17 @@ def map_values_df_to_dp_requests(
 
     # Reduce singular dimensions
     p50s = forecast_values_df['p50_mw'].values.astype(float)
-    p50s = p50s * 1*10**6 / float(capacity_watts)
-    
+    p50s = (p50s * 1*10**6 / float(capacity_watts)).clip(0, 1)
+
     # add p10s and p90s if they exist
     if 'p10_mw' in forecast_values_df.columns:
-        p10s = forecast_values_df['p10_mw'].values.astype(float) 
-        p10s = p10s * 1*10**6 / float(capacity_watts)
+        p10s = forecast_values_df['p10_mw'].values.astype(float)
+        p10s = (p10s * 1*10**6 / float(capacity_watts)).clip(0, 1)
     else:
         p10s = [None]*len(p50s)
     if 'p90_mw' in forecast_values_df.columns:
         p90s = forecast_values_df['p90_mw'].values.astype(float)
-        p90s = p90s * 1*10**6 / float(capacity_watts)
+        p90s = (p90s * 1*10**6 / float(capacity_watts)).clip(0, 1)
     else:
         p90s = [None]*len(p50s)
 
@@ -184,17 +194,32 @@ async def fetch_dp_gsp_uuid_map(
     for exc in filter(lambda x: isinstance(x, Exception), list_results):
         raise exc
 
+    location_dicts = list(itertools.chain(*[
+        r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)["locations"]
+        for r in list_results
+    ]))
+
+    if not location_dicts:
+        logger.warning("No locations returned from Data Platform")
+        return {}
+
+    # Ensure every location dict has a 'metadata' key so the column always exists in the DataFrame
+    for loc in location_dicts:
+        loc.setdefault("metadata", {})
+
+    locations_df = pd.DataFrame.from_dict(location_dicts)
+
+    if "metadata" not in locations_df.columns:
+        logger.warning("No 'metadata' column in Data Platform locations response")
+        return {}
+
     locations_df = (
-        # Convert and combine the location lists from the responses into a single DataFrame
-        pd.DataFrame.from_dict(
-            itertools.chain(*[
-                r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)["locations"]
-                for r in list_results],
-            ),
-        )
+        locations_df
         # Filter the returned locations to those with a gsp_id in the metadata; extract it
         .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
         .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: int(x["gsp_id"]["number_value"])))
+        # Keep the last entry for each gsp_id to avoid duplicate index errors
+        .drop_duplicates(subset=["gsp_id"], keep="last")
         .set_index("gsp_id", drop=False, inplace=False)
     )
 

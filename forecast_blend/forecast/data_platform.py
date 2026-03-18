@@ -87,7 +87,7 @@ async def get_forecast_values_from_data_platform(
     location_uuid: str,
     model_name: str,
     start_datetime: datetime | None,
-    gsp_id: int = -1,
+    gsp_id: int,
 ) -> pd.DataFrame:
     """Get forecast values from Data Platform.
 

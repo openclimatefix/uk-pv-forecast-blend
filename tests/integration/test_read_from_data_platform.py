@@ -107,7 +107,13 @@ async def setup_test_data(dp_client):
 
     # Create forecasters for different models
     forecasters = {}
-    for model_name in ["pvnet_day_ahead", "national_xg", "pvnet_v2"]:
+    for model_name in [
+        "pvnet_day_ahead",
+        "pvnet_day_ahead_adjust",
+        "national_xg",
+        "national_xg_adjust",
+        "pvnet_v2",
+    ]:
         response = await client.create_forecaster(
             dp.CreateForecasterRequest(name=model_name, version="1.0.0")
         )
@@ -313,12 +319,48 @@ async def test_blend_forecasts_from_data_platform(
         capacity_watts=test_data["locations"][0]["capacity_watts"],
     )
 
+    # Create corresponding adjuster forecasts for national model logic (gsp_id=0).
+    pvnet_adjust_values = [
+        {
+            "target_time": init_time + datetime.timedelta(minutes=30 * i),
+            "p50_mw": 80 + i * 10,
+        }
+        for i in range(1, 9)
+    ]
+    await create_test_forecast(
+        client=client,
+        forecaster=test_data["forecasters"]["pvnet_day_ahead_adjust"],
+        location_uuid=test_data["locations"][0]["uuid"],
+        init_time=init_time,
+        forecast_values=pvnet_adjust_values,
+        capacity_watts=test_data["locations"][0]["capacity_watts"],
+    )
+
+    xg_adjust_values = [
+        {
+            "target_time": init_time + datetime.timedelta(minutes=30 * i),
+            "p50_mw": 150 + i * 10,
+        }
+        for i in range(1, 9)
+    ]
+    await create_test_forecast(
+        client=client,
+        forecaster=test_data["forecasters"]["national_xg_adjust"],
+        location_uuid=test_data["locations"][0]["uuid"],
+        init_time=init_time,
+        forecast_values=xg_adjust_values,
+        capacity_watts=test_data["locations"][0]["capacity_watts"],
+    )
+
+    gsp_id = 0
+
     # Get forecasts for both models
     pvnet_forecast = await get_forecast_values_from_data_platform(
         client=client,
         location_uuid=test_data["locations"][0]["uuid"],
         model_name="pvnet_day_ahead",
         start_datetime=init_time.replace(tzinfo=None),
+        gsp_id=gsp_id,
     )
 
     xg_forecast = await get_forecast_values_from_data_platform(
@@ -326,6 +368,7 @@ async def test_blend_forecasts_from_data_platform(
         location_uuid=test_data["locations"][0]["uuid"],
         model_name="national_xg",
         start_datetime=init_time.replace(tzinfo=None),
+        gsp_id=gsp_id,
     )
 
     # Verify we got data from both models
@@ -340,6 +383,14 @@ async def test_blend_forecasts_from_data_platform(
 
     # The values should be different since we created different forecasts
     assert pvnet_first_value != xg_first_value, "Forecasts should have different values"
+
+    # For gsp_id=0, adjust_mw should be derived from main - adjuster forecasts.
+    assert (pvnet_forecast["adjust_mw"] != 0.0).all(), (
+        "Expected non-zero adjust_mw values for national pvnet forecast"
+    )
+    assert (xg_forecast["adjust_mw"] != 0.0).all(), (
+        "Expected non-zero adjust_mw values for national xg forecast"
+    )
 
 
 @pytest.mark.asyncio(loop_scope="module")

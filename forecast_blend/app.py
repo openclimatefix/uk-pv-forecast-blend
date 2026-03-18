@@ -182,8 +182,11 @@ async def app(gsps: list[int] | None = None) -> None:
 
     async with channel:
         client = dp.DataPlatformDataServiceStub(channel)
-        try:
-            gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+
+        gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+        if not gsp_uuid_map:
+            logger.warning("No GSP locations found in Data Platform — skipping DP save")
+        else:
             _ = await save_forecast_to_data_platform(
                 forecast_values_by_gsp_id=forecast_values_by_gsp_id,
                 locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
@@ -191,10 +194,7 @@ async def app(gsps: list[int] | None = None) -> None:
                 init_time_utc=t0.to_pydatetime(),
                 client=client,
                 metadata=metadata,
-                )
-
-        finally:
-            channel.close()
+            )
 
     logger.info("Finished")
 

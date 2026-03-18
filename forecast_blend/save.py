@@ -184,14 +184,27 @@ async def fetch_dp_gsp_uuid_map(
     for exc in filter(lambda x: isinstance(x, Exception), list_results):
         raise exc
 
+    location_dicts = list(itertools.chain(*[
+        r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)["locations"]
+        for r in list_results
+    ]))
+
+    if not location_dicts:
+        logger.warning("No locations returned from Data Platform")
+        return {}
+
+    # Ensure every location dict has a 'metadata' key so the column always exists in the DataFrame
+    for loc in location_dicts:
+        loc.setdefault("metadata", {})
+
+    locations_df = pd.DataFrame.from_dict(location_dicts)
+
+    if "metadata" not in locations_df.columns:
+        logger.warning("No 'metadata' column in Data Platform locations response")
+        return {}
+
     locations_df = (
-        # Convert and combine the location lists from the responses into a single DataFrame
-        pd.DataFrame.from_dict(
-            itertools.chain(*[
-                r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)["locations"]
-                for r in list_results],
-            ),
-        )
+        locations_df
         # Filter the returned locations to those with a gsp_id in the metadata; extract it
         .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
         .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: int(x["gsp_id"]["number_value"])))

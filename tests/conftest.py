@@ -1,9 +1,14 @@
 import os
+import time
 from datetime import datetime, timedelta, timezone
+from importlib.metadata import version
 import time_machine
 
 import pytest
+from grpclib.client import Channel
 from testcontainers.postgres import PostgresContainer
+from testcontainers.core.container import DockerContainer
+from dp_sdk.ocf import dp
 
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts
@@ -11,6 +16,44 @@ from nowcasting_datamodel.save.save import save
 
 from forecast_blend.weights import ALL_MODEL_NAMES
 
+
+@pytest.fixture(scope="session", autouse=True)
+def data_platform_container():
+    """Spin up the Data Platform gRPC server for the test session.
+
+    Mirrors the pattern used in tests/integration/test_save_to_data_platform.py.
+    Sets DATA_PLATFORM_HOST and DATA_PLATFORM_PORT env vars so app.py connects to it.
+    """
+    with PostgresContainer(
+        "ghcr.io/openclimatefix/data-platform-pgdb:0.21.2",
+        username="postgres",
+        password="postgres",  # noqa: S106
+        dbname="postgres",
+        env={"POSTGRES_HOST": "db"},
+    ) as postgres:
+        database_url = postgres.get_connection_url()
+        database_url = database_url.replace("postgresql+psycopg2", "postgres")
+        database_url = database_url.replace("localhost", "host.docker.internal")
+
+        with DockerContainer(
+            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
+            env={"DATABASE_URL": database_url},
+            ports=[50051],
+            platform="linux/amd64",
+        ) as data_platform_server:
+            time.sleep(2)  # Give some time for the server to start
+
+            port = data_platform_server.get_exposed_port(50051)
+            host = data_platform_server.get_container_host_ip()
+
+            # Set env vars so app.py connects to the test container
+            os.environ["DATA_PLATFORM_HOST"] = host
+            os.environ["DATA_PLATFORM_PORT"] = str(port)
+
+            channel = Channel(host=host, port=port)
+            client = dp.DataPlatformDataServiceStub(channel)
+            yield client, host, port
+            channel.close()
 # Arbitrarily set the blend name so we can test it is properly set throughout tests
 os.environ["BLEND_NAME"] = "test_blend_name"
 

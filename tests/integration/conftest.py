@@ -8,7 +8,6 @@ created in sync context.
 
 import datetime
 
-import pytest
 import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp

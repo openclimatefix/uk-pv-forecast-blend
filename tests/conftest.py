@@ -5,10 +5,8 @@ from importlib.metadata import version
 import time_machine
 
 import pytest
-from grpclib.client import Channel
 from testcontainers.postgres import PostgresContainer
 from testcontainers.core.container import DockerContainer
-from dp_sdk.ocf import dp
 
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts

@@ -116,34 +116,30 @@ async def app(gsps: list[int] | None = None) -> None:
         metadata = None
         for gsp_id in gsps:
             logger.info(f"Blending forecasts for gsp id {gsp_id}")
-            try:
 
-                location = get_location(session=session, gsp_id=gsp_id)
+            location = get_location(session=session, gsp_id=gsp_id)
 
-                # 1. and 2. load and blend forecast values together
-                forecast_values_df = await get_blend_forecast_values_latest(
-                    session=session,
-                    gsp_id=gsp_id,
-                    start_datetime=start_datetime,
-                    weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
-                    gsp_uuid_map=gsp_uuid_map,
-                    dp_client=dp_client,
-                )
-                forecast_values_by_gsp_id[gsp_id] = forecast_values_df
-  
-                # make Forecast SQL
-                forecast_values = convert_df_to_list_forecast_values(forecast_values_df.copy())
-                assert len(forecast_values) > 0, "No forecast values made"
-                forecast = make_forecast(
-                    forecast_values=forecast_values,
-                    location=location,
-                    model=model,
-                    input_data_last_updated=input_data_last_updated,
-                )
-                forecasts.append(forecast)
-            except Exception as e:
-                logger.exception(f"Failed to blend forecasts for gsp_id {gsp_id}")
-                logger.debug(f"Exception: {e}")
+            # 1. and 2. load and blend forecast values together
+            forecast_values_df = await get_blend_forecast_values_latest(
+                session=session,
+                gsp_id=gsp_id,
+                start_datetime=start_datetime,
+                weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
+                gsp_uuid_map=gsp_uuid_map,
+                dp_client=dp_client,
+            )
+            forecast_values_by_gsp_id[gsp_id] = forecast_values_df
+
+            # make Forecast SQL
+            forecast_values = convert_df_to_list_forecast_values(forecast_values_df.copy())
+            assert len(forecast_values) > 0, "No forecast values made"
+            forecast = make_forecast(
+                forecast_values=forecast_values,
+                location=location,
+                model=model,
+                input_data_last_updated=input_data_last_updated,
+            )
+            forecasts.append(forecast)
 
         # Close data platform channel if it was opened
         if dp_channel is not None:
@@ -197,8 +193,6 @@ async def app(gsps: list[int] | None = None) -> None:
                 metadata=metadata,
                 )
 
-        except Exception as e:
-            logger.error(f"Failed to save forecast to data platform with error {e}")
         finally:
             channel.close()
 

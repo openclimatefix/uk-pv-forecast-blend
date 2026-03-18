@@ -58,6 +58,7 @@ into National_XG if needed - but this should rarely be the case
 - `ALLOW_CLOUDCASTING`: Whether to allow `"pvnet_cloud"` to be part of the blend. Defaults to False
 - `DATA_PLATFORM_HOST`: The data platform host name. Default is `localhost`
 - `DATA_PLATFORM_PORT`: The data platform port. Default is `50051`.
+- `READ_FROM_DATA_PLATFORM`: Whether to read forecasts from Data Platform instead of the database. Defaults to false.
 
 # Tests
 

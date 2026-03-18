@@ -93,6 +93,7 @@ async def get_blend_forecast_values_latest(
                     location_uuid=location_uuid,
                     model_name=model_name,
                     start_datetime=start_datetime,
+                    gsp_id=gsp_id,
                 )
                 for model_name in model_names
             ]

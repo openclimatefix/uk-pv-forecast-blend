@@ -137,15 +137,15 @@ async def _fetch_latest_forecast_metadata_from_dp(
             if forecaster_name not in model_names:
                 continue
 
-                init_time = forecast.initialization_timestamp_utc
+            init_time = forecast.initialization_timestamp_utc
 
-                if init_time and init_time >= earliest_creation_time:
-                    rows.append({
-                        "created_utc": init_time,
-                        "forecast_creation_time": init_time,
-                        "location_id": forecast.location_uuid,
-                        "name": forecaster_name,
-                    })
+            if init_time and init_time >= earliest_creation_time:
+                rows.append({
+                    "created_utc": init_time,
+                    "forecast_creation_time": init_time,
+                    "location_id": forecast.location_uuid,
+                    "name": forecaster_name,
+                })
 
     if not rows:
         logger.warning("No forecast metadata found from Data Platform")

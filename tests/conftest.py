@@ -17,15 +17,16 @@ from nowcasting_datamodel.save.save import save
 from forecast_blend.weights import ALL_MODEL_NAMES
 
 
-@pytest.fixture(scope="session", autouse=True)
-def data_platform_container():
-    """Spin up the Data Platform gRPC server for the test session.
+@pytest.fixture(scope="session")
+def dp_client():
+    """Spin up a single shared Data Platform gRPC server for the entire test session.
 
-    Mirrors the pattern used in tests/integration/test_save_to_data_platform.py.
+    Yields (host, port) only. Callers must create their own Channel+stub within
+    their own async event loop to avoid 'Future attached to a different loop' errors.
     Sets DATA_PLATFORM_HOST and DATA_PLATFORM_PORT env vars so app.py connects to it.
     """
     with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:0.21.2",
+        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
         username="postgres",
         password="postgres",  # noqa: S106
         dbname="postgres",
@@ -50,10 +51,7 @@ def data_platform_container():
             os.environ["DATA_PLATFORM_HOST"] = host
             os.environ["DATA_PLATFORM_PORT"] = str(port)
 
-            channel = Channel(host=host, port=port)
-            client = dp.DataPlatformDataServiceStub(channel)
-            yield client, host, port
-            channel.close()
+            yield host, port
 # Arbitrarily set the blend name so we can test it is properly set throughout tests
 os.environ["BLEND_NAME"] = "test_blend_name"
 

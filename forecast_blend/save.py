@@ -208,6 +208,8 @@ async def fetch_dp_gsp_uuid_map(
         # Filter the returned locations to those with a gsp_id in the metadata; extract it
         .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
         .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: int(x["gsp_id"]["number_value"])))
+        # Keep the last entry for each gsp_id to avoid duplicate index errors
+        .drop_duplicates(subset=["gsp_id"], keep="last")
         .set_index("gsp_id", drop=False, inplace=False)
     )
 

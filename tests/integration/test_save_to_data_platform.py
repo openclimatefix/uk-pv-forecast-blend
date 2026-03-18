@@ -1,56 +1,11 @@
 import datetime
-import time
 
 import pandas as pd
 import pytest
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
-from grpclib.client import Channel
-import pytest_asyncio
-from testcontainers.core.container import DockerContainer
-from testcontainers.postgres import PostgresContainer
-from importlib.metadata import version
 
 from forecast_blend.save import save_forecast_to_data_platform
-
-
-@pytest_asyncio.fixture(scope="session")
-def client():
-    """
-    Fixture to spin up a PostgreSQL container for the entire test session.
-    This fixture uses `testcontainers` to start a fresh PostgreSQL container and provides
-    the connection URL dynamically for use in other fixtures.
-    """
-
-    # we use a specific postgres image with postgis and pgpartman installed
-    # TODO make a release of this, not using logging tag.
-    with PostgresContainer(
-        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
-        username="postgres",
-        password="postgres",  #noqa: S106
-        dbname="postgres",
-        env={"POSTGRES_HOST": "db"},
-    ) as postgres:
-        database_url = postgres.get_connection_url()
-        # we need to get ride of psycopg2, so the go driver works
-        database_url = database_url.replace("postgresql+psycopg2", "postgres")
-        # we need to change to host.docker.internal so the data platform container can see it
-        # https://stackoverflow.com/questions/46973456/docker-access-localhost-port-from-container
-        database_url = database_url.replace("localhost", "host.docker.internal")
-
-        with DockerContainer(
-            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
-            env={"DATABASE_URL": database_url},
-            ports=[50051],
-        ) as data_platform_server:
-            time.sleep(1)  # Give some time for the server to start
-
-            port = data_platform_server.get_exposed_port(50051)
-            host = data_platform_server.get_container_host_ip()
-            channel = Channel(host=host, port=port)
-            client = dp.DataPlatformDataServiceStub(channel)
-            yield client
-            channel.close()
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -102,7 +57,9 @@ async def test_save_to_generation_to_data_platform(client):
 
     # check: read from the data platform to check it was saved
     list_forecasters_response = await client.list_forecasters(dp.ListForecastersRequest())
-    assert len(list_forecasters_response.forecasters) == 2
+    forecaster_names = {f.forecaster_name for f in list_forecasters_response.forecasters}
+    assert "test_model" in forecaster_names
+    assert "test_model_adjust" in forecaster_names
 
     # check: There is a forecast object
     get_latest_forecasts_request = dp.GetLatestForecastsRequest(

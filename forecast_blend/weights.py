@@ -131,12 +131,11 @@ async def _fetch_latest_forecast_metadata_from_dp(
 
     rows = []
     for response in responses:
-        try:
-            for forecast in response.forecasts:
-                forecaster_name = forecast.forecaster.forecaster_name
+        for forecast in response.forecasts:
+            forecaster_name = forecast.forecaster.forecaster_name
 
-                if forecaster_name not in model_names:
-                    continue
+            if forecaster_name not in model_names:
+                continue
 
                 init_time = forecast.initialization_timestamp_utc
 
@@ -147,10 +146,6 @@ async def _fetch_latest_forecast_metadata_from_dp(
                         "location_id": forecast.location_uuid,
                         "name": forecaster_name,
                     })
-
-        except Exception as e:
-            logger.warning(f"Skipping failed forecast response: {e}")
-            continue
 
     if not rows:
         logger.warning("No forecast metadata found from Data Platform")

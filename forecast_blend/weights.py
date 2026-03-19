@@ -206,13 +206,13 @@ def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[st
         t0: The blend forecast init time
     
     """
-    
+
     # Filter to the most recent forecast ID per model
     df_forecast_ids = (
         df_forecast_ids.groupby("name")[df_forecast_ids.columns]
         .apply(_get_most_recent_row)
     )
-    
+
     # TODO: Use the saved forecast initialisation time when available
     # https://github.com/openclimatefix/nowcasting_datamodel/issues/315
     # Approximate the forecast initialisation time

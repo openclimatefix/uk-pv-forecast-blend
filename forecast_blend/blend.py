@@ -81,33 +81,34 @@ async def get_blend_forecast_values_latest(
         if uuid_map is None:
             uuid_map = await fetch_dp_gsp_uuid_map(client)
 
-            if gsp_id not in uuid_map:
-                raise ValueError(f"GSP {gsp_id} not found in Data Platform")
+        if gsp_id not in uuid_map:
+            logger.warning(f"GSP {gsp_id} not found in Data Platform — skipping")
+            return pd.DataFrame()
 
-            location_uuid = uuid_map[gsp_id]["location_uuid"]
+        location_uuid = uuid_map[gsp_id]["location_uuid"]
 
-            tasks = [
-                get_forecast_values_from_data_platform(
-                    client=client,
-                    location_uuid=location_uuid,
-                    model_name=model_name,
-                    start_datetime=start_datetime,
+        tasks = [
+            get_forecast_values_from_data_platform(
+                client=client,
+                location_uuid=location_uuid,
+                model_name=model_name,
+                start_datetime=start_datetime,
+            )
+            for model_name in model_names
+        ]
+
+        results = await asyncio.gather(*tasks)
+
+        # Results are DataFrames, collect non-empty ones
+        for df in results:
+            if len(df) > 0:
+                forecast_values_all_model_dfs.append(df)
+            else:
+                model_name = df["model_name"].iloc[0] if len(df) > 0 else "unknown"
+                logger.debug(
+                    f"No forecast values for {model_name} "
+                    f"for gsp_id {gsp_id}"
                 )
-                for model_name in model_names
-            ]
-
-            results = await asyncio.gather(*tasks)
-
-            # Results are DataFrames, collect non-empty ones
-            for df in results:
-                if len(df) > 0:
-                    forecast_values_all_model_dfs.append(df)
-                else:
-                    model_name = df["model_name"].iloc[0] if len(df) > 0 else "unknown"
-                    logger.debug(
-                        f"No forecast values for {model_name} "
-                        f"for gsp_id {gsp_id}"
-                    )
 
         # Close the channel only if we created it locally
         if local_channel is not None:

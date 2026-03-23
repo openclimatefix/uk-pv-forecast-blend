@@ -186,21 +186,17 @@ async def app(gsps: list[int] | None = None) -> None:
 
     async with channel:
         client = dp.DataPlatformDataServiceStub(channel)
-        try:
-            gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
-            _ = await save_forecast_to_data_platform(
-                forecast_values_by_gsp_id=forecast_values_by_gsp_id,
-                locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
-                model_tag=blend_name,
-                init_time_utc=t0.to_pydatetime(),
-                client=client,
-                metadata=metadata,
-                )
-
-        except Exception as e:
-            logger.error(f"Failed to save forecast to data platform with error {e}")
-        finally:
-            channel.close()
+        
+        gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+        _ = await save_forecast_to_data_platform(
+            forecast_values_by_gsp_id=forecast_values_by_gsp_id,
+            locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
+            model_tag=blend_name,
+            init_time_utc=t0.to_pydatetime(),
+            client=client,
+            metadata=metadata,
+            )
+        channel.close()
 
     logger.info("Finished")
 

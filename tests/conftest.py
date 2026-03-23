@@ -1,9 +1,12 @@
 import os
+import time
 from datetime import datetime, timedelta, timezone
+from importlib.metadata import version
 import time_machine
 
 import pytest
 from testcontainers.postgres import PostgresContainer
+from testcontainers.core.container import DockerContainer
 
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_forecasts
@@ -11,6 +14,42 @@ from nowcasting_datamodel.save.save import save
 
 from forecast_blend.weights import ALL_MODEL_NAMES
 
+
+@pytest.fixture(scope="session")
+def dp_client():
+    """Spin up a single shared Data Platform gRPC server for the entire test session.
+
+    Yields (host, port) only. Callers must create their own Channel+stub within
+    their own async event loop to avoid 'Future attached to a different loop' errors.
+    Sets DATA_PLATFORM_HOST and DATA_PLATFORM_PORT env vars so app.py connects to it.
+    """
+    with PostgresContainer(
+        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
+        username="postgres",
+        password="postgres",  # noqa: S106
+        dbname="postgres",
+        env={"POSTGRES_HOST": "db"},
+    ) as postgres:
+        database_url = postgres.get_connection_url()
+        database_url = database_url.replace("postgresql+psycopg2", "postgres")
+        database_url = database_url.replace("localhost", "host.docker.internal")
+
+        with DockerContainer(
+            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
+            env={"DATABASE_URL": database_url},
+            ports=[50051],
+            platform="linux/amd64",
+        ) as data_platform_server:
+            time.sleep(2)  # Give some time for the server to start
+
+            port = data_platform_server.get_exposed_port(50051)
+            host = data_platform_server.get_container_host_ip()
+
+            # Set env vars so app.py connects to the test container
+            os.environ["DATA_PLATFORM_HOST"] = host
+            os.environ["DATA_PLATFORM_PORT"] = str(port)
+
+            yield host, port
 # Arbitrarily set the blend name so we can test it is properly set throughout tests
 os.environ["BLEND_NAME"] = "test_blend_name"
 
@@ -36,7 +75,7 @@ def forecasts(db_session):
             n_fake_forecasts=16,
             t0_datetime_utc=t0_datetime_utc,
         )
-        
+
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
 

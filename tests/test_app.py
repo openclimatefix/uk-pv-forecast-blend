@@ -135,7 +135,7 @@ def test_app_only_national(db_session, forecast_national, dp_client):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == N * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * 16
 
-    asyncio.run(app(gsps=[0]))
+    asyncio.run(app(gsps=list(range(0, 2))))
 
     assert len(db_session.query(ForecastValueSQL).all()) == (N+1) * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N+1) * 16

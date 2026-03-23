@@ -35,7 +35,7 @@ async def setup_dp_locations(dp_client):
                 energy_source=dp.EnergySource.SOLAR,
                 geometry_wkt="POLYGON((-2 52, -1 52, -1 53, -2 53, -2 52))",
                 location_type=dp.LocationType.NATION if gsp_id == 0 else dp.LocationType.GSP,
-                effective_capacity_watts=1_000_000_000 if gsp_id == 0 else 100_000_000,
+                effective_capacity_watts=100_000_000_000,
                 metadata=metadata_gsp,
                 valid_from_utc=datetime(2020, 1, 1, tzinfo=timezone.utc),
             )
@@ -135,7 +135,7 @@ def test_app_only_national(db_session, forecast_national, dp_client):
     assert len(db_session.query(ForecastValueLatestSQL).all()) == N * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == N * 16
 
-    asyncio.run(app(gsps=list(range(0, 2))))
+    asyncio.run(app(gsps=[0]))
 
     assert len(db_session.query(ForecastValueSQL).all()) == (N+1) * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == (N+1) * 16

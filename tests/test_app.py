@@ -166,12 +166,7 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg, dp_cl
     # get all the blended forecast values latest
     models = db_session.query(MLModelSQL).where(MLModelSQL.name == os.environ["BLEND_NAME"]).all()
     assert len(models) == 1
-    fvs = (
-        db_session.query(ForecastValueLatestSQL)
-        .where(ForecastValueLatestSQL.model_id == models[0].id)
-        .order_by(ForecastValueLatestSQL.target_time)
-        .all()
-    )
+    fvs = db_session.query(ForecastValueLatestSQL).where(ForecastValueLatestSQL.model_id == models[0].id).all()
 
     assert len(fvs) == 25
 
@@ -182,8 +177,8 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg, dp_cl
 
     for i, fv in enumerate(fvs):
         assert (
-            (float(fv.expected_power_generation_megawatts), fv.target_time)
-             == (float(expected_values.values[i]), expected_values.index[i].to_pydatetime())
+            (fv.expected_power_generation_megawatts, fv.target_time)
+             == (expected_values.values[i], expected_values.index[i])
         )
 
     assert len(db_session.query(ForecastValueSQL).all()) == (N * number_of_forecast_values) + 25

@@ -166,7 +166,12 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg, dp_cl
     # get all the blended forecast values latest
     models = db_session.query(MLModelSQL).where(MLModelSQL.name == os.environ["BLEND_NAME"]).all()
     assert len(models) == 1
-    fvs = db_session.query(ForecastValueLatestSQL).where(ForecastValueLatestSQL.model_id == models[0].id).all()
+    fvs = (
+        db_session.query(ForecastValueLatestSQL)
+        .where(ForecastValueLatestSQL.model_id == models[0].id)
+        .order_by(ForecastValueLatestSQL.target_time)
+        .all()
+    )
 
     assert len(fvs) == 25
 

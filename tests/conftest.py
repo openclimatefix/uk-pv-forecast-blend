@@ -77,8 +77,6 @@ def forecasts(db_session):
         )
         
         save(forecasts=f, session=db_session, apply_adjuster=False)
-    # Commit so that app() (which opens its own session) can read this data
-    db_session.commit()
 
 
 @pytest.fixture
@@ -101,8 +99,7 @@ def forecast_national(db_session):
         )
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
-    # Commit so that app() (which opens its own session) can read this data
-    db_session.commit()
+    
 
 
 @pytest.fixture
@@ -126,8 +123,7 @@ def forecast_national_ecmwf_and_xg(db_session):
                 fv.expected_power_generation_megawatts = i
 
         save(forecasts=forecasts, session=db_session, apply_adjuster=False)
-    # Commit so that app() (which opens its own session) can read this data
-    db_session.commit()
+    
 
 
 @pytest.fixture
@@ -148,8 +144,7 @@ def forecast_national_all_now(db_session):
         )
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
-    # Commit so that app() (which opens its own session) can read this data
-    db_session.commit()
+   
 
 
 # This is a bit complicated and sensitive to change
@@ -182,11 +177,18 @@ def engine_url():
 def db_connection(engine_url):
     database_connection = DatabaseConnection(engine_url, echo=False)
 
+    # engine = database_connection.engine
+    # connection = engine.connect()
+    # transaction = connection.begin()
+
     # There should be a way to only make the tables once
     # but make sure we remove the data
     database_connection.create_all()
 
     yield database_connection
+
+    # transaction.rollback()
+    # connection.close()
 
     database_connection.drop_all()
 
@@ -195,10 +197,13 @@ def db_connection(engine_url):
 def db_session(db_connection, engine_url):
     """Creates a new database session for a test."""
 
-    with db_connection.Session() as s:
-        yield s
+    # connection = db_connection.engine.connect()
+    # t = connection.begin()
 
-    # Clean up ALL data after the test, including rows committed by app()'s
-    # independent session (which db_session.rollback() would NOT undo).
-    db_connection.drop_all()
-    db_connection.create_all()
+    with db_connection.Session() as s:
+        s.begin()
+        yield s
+        s.rollback()
+
+    # t.rollback()
+    # connection.close()

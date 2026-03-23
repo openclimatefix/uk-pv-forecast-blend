@@ -131,21 +131,26 @@ async def _fetch_latest_forecast_metadata_from_dp(
 
     rows = []
     for response in responses:
-        for forecast in response.forecasts:
-            forecaster_name = forecast.forecaster.forecaster_name
+        try:
+            for forecast in response.forecasts:
+                forecaster_name = forecast.forecaster.forecaster_name
 
-            if forecaster_name not in model_names:
-                continue
+                if forecaster_name not in model_names:
+                    continue
 
-            init_time = forecast.initialization_timestamp_utc
+                init_time = forecast.initialization_timestamp_utc
 
-            if init_time and init_time >= earliest_creation_time:
-                rows.append({
-                    "created_utc": init_time,
-                    "forecast_creation_time": init_time,
-                    "location_id": forecast.location_uuid,
-                    "name": forecaster_name,
-                })
+                if init_time and init_time >= earliest_creation_time:
+                    rows.append({
+                        "created_utc": init_time,
+                        "forecast_creation_time": init_time,
+                        "location_id": forecast.location_uuid,
+                        "name": forecaster_name,
+                    })
+
+        except Exception as e:
+            logger.warning(f"Skipping failed forecast response: {e}")
+            continue
 
     if not rows:
         logger.warning("No forecast metadata found from Data Platform")
@@ -206,13 +211,13 @@ def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[st
         t0: The blend forecast init time
     
     """
-
+    
     # Filter to the most recent forecast ID per model
     df_forecast_ids = (
         df_forecast_ids.groupby("name")[df_forecast_ids.columns]
         .apply(_get_most_recent_row)
     )
-
+    
     # TODO: Use the saved forecast initialisation time when available
     # https://github.com/openclimatefix/nowcasting_datamodel/issues/315
     # Approximate the forecast initialisation time

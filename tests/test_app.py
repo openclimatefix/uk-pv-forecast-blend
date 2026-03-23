@@ -3,6 +3,10 @@ import time_machine
 import os
 import asyncio
 import pytest
+import pytest_asyncio
+from dp_sdk.ocf import dp
+from betterproto.lib.google.protobuf import Struct, Value
+from grpclib.client import Channel
 
 from nowcasting_datamodel.models import LocationSQL
 from nowcasting_datamodel.models.forecast import (
@@ -14,6 +18,31 @@ from nowcasting_datamodel.models.forecast import (
 from nowcasting_datamodel.models.models import MLModelSQL
 
 from forecast_blend.app import app, is_last_forecast_made_before_last_30_minutes_step
+
+
+@pytest_asyncio.fixture(autouse=True, scope="module")
+async def setup_dp_locations(dp_client):
+    """Create necessary locations in Data Platform for the tests."""
+    host, port = dp_client
+    channel = Channel(host=host, port=port)
+    client = dp.DataPlatformDataServiceStub(channel)
+    from datetime import datetime, timezone
+    for gsp_id in range(0, 15):
+        try:
+            metadata_gsp = Struct(fields={"gsp_id": Value(number_value=gsp_id)})
+            create_location_request = dp.CreateLocationRequest(
+                location_name=f"test_gsp_{gsp_id}",
+                energy_source=dp.EnergySource.SOLAR,
+                geometry_wkt="POLYGON((-2 52, -1 52, -1 53, -2 53, -2 52))",
+                location_type=dp.LocationType.NATION if gsp_id == 0 else dp.LocationType.GSP,
+                effective_capacity_watts=1_000_000_000 if gsp_id == 0 else 100_000_000,
+                metadata=metadata_gsp,
+                valid_from_utc=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            )
+            await client.create_location(create_location_request)
+        except Exception:
+            pass
+    channel.close()
 
 
 @time_machine.travel("2023-01-01 00:00:01")
@@ -143,13 +172,13 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg, dp_cl
 
     expected_values = pd.Series(
         [0]*15+[0.25, 0.5, 0.75]+[1]*7,
-        index=pd.date_range("2022-12-31 23:30", "2023-01-01 11:30", freq="30min", tz="UTC"),
+        index=pd.date_range("2022-12-31 18:00", "2023-01-01 06:00", freq="30min", tz="UTC"),
     )
 
     for i, fv in enumerate(fvs):
         assert (
-            (fv.expected_power_generation_megawatts, fv.target_time)
-             == (expected_values.values[i], expected_values.index[i])
+            (float(fv.expected_power_generation_megawatts), fv.target_time)
+             == (float(expected_values.values[i]), expected_values.index[i].to_pydatetime())
         )
 
     assert len(db_session.query(ForecastValueSQL).all()) == (N * number_of_forecast_values) + 25

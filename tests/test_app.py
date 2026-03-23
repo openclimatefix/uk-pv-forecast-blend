@@ -177,7 +177,7 @@ def test_app_only_ecwmf_and_xg(db_session, forecast_national_ecmwf_and_xg, dp_cl
 
     expected_values = pd.Series(
         [0]*15+[0.25, 0.5, 0.75]+[1]*7,
-        index=pd.date_range("2022-12-31 18:00", "2023-01-01 06:00", freq="30min", tz="UTC"),
+        index=pd.date_range("2022-12-31 23:30", "2023-01-01 11:30", freq="30min", tz="UTC"),
     )
 
     for i, fv in enumerate(fvs):

@@ -101,7 +101,6 @@ def forecast_national(db_session):
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
 
-
 @pytest.fixture
 @time_machine.travel("2023-01-01 00:00:00")
 def forecast_national_ecmwf_and_xg(db_session):
@@ -125,7 +124,6 @@ def forecast_national_ecmwf_and_xg(db_session):
         save(forecasts=forecasts, session=db_session, apply_adjuster=False)
 
 
-
 @pytest.fixture
 @time_machine.travel("2023-01-01 00:00:00")
 def forecast_national_all_now(db_session):
@@ -144,7 +142,6 @@ def forecast_national_all_now(db_session):
         )
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
-
 
 
 # This is a bit complicated and sensitive to change

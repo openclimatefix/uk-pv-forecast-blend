@@ -75,7 +75,7 @@ def forecasts(db_session):
             n_fake_forecasts=16,
             t0_datetime_utc=t0_datetime_utc,
         )
-        
+
         save(forecasts=f, session=db_session, apply_adjuster=False)
 
 
@@ -99,7 +99,7 @@ def forecast_national(db_session):
         )
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
-    
+
 
 
 @pytest.fixture
@@ -123,7 +123,7 @@ def forecast_national_ecmwf_and_xg(db_session):
                 fv.expected_power_generation_megawatts = i
 
         save(forecasts=forecasts, session=db_session, apply_adjuster=False)
-    
+
 
 
 @pytest.fixture
@@ -144,7 +144,7 @@ def forecast_national_all_now(db_session):
         )
 
         save(forecasts=f, session=db_session, apply_adjuster=False)
-   
+
 
 
 # This is a bit complicated and sensitive to change

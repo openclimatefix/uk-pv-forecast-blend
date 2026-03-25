@@ -237,7 +237,7 @@ async def create_forecaster_if_not_exists(
 ) -> dp.Forecaster:
     """Create the current forecaster if it does not exist."""
     name = model_tag.replace("-", "_")
-    version = "1.3.0"
+    f_version = "1.3.0"
 
     list_forecasters_request = dp.ListForecastersRequest(
         forecaster_names_filter=[name],
@@ -248,7 +248,7 @@ async def create_forecaster_if_not_exists(
         filtered_forecasters = [
             f
             for f in list_forecasters_response.forecasters
-            if f.forecaster_version == version
+            if f.forecaster_version == f_version
         ]
         if len(filtered_forecasters) == 1:
             # Forecaster exists, return it
@@ -257,7 +257,7 @@ async def create_forecaster_if_not_exists(
             # Forecaster version does not exist, update it
             update_forecaster_request = dp.UpdateForecasterRequest(
                 name=name,
-                new_version=version,
+                new_version=f_version,
             )
             update_forecaster_response = await client.update_forecaster(
                 update_forecaster_request
@@ -267,7 +267,7 @@ async def create_forecaster_if_not_exists(
         # Forecaster does not exist, create it
         create_forecaster_request = dp.CreateForecasterRequest(
             name=name,
-            version=version,
+            version=f_version,
         )
         create_forecaster_response = await client.create_forecaster(
             create_forecaster_request
@@ -322,13 +322,13 @@ async def get_metadata(
     version_dict = {"blend": version("uk-pv-forecast-blend")}
     # now lets also set the app_version
     for forecast in forecasts:
-        version = forecast.forecaster.forecaster_version
+        f_version = forecast.forecaster.forecaster_version
         name = forecast.forecaster.forecaster_name
         if name in ['pvnet_day_ahead', "pvnet_v2", "pvnet_ecmwf"]:
-            version_dict[name] = version
+            version_dict[name] = f_version
 
-    version = json.dumps(version_dict)
-    metadata_dict['app_version'] = Value(string_value=version)
+    version_str = json.dumps(version_dict)
+    metadata_dict['app_version'] = Value(string_value=version_str)
 
 
     return Struct(fields=metadata_dict)

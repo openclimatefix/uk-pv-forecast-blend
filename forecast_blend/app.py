@@ -37,7 +37,7 @@ from nowcasting_datamodel.save.save import save
 from nowcasting_datamodel.save.update import N_GSP, update_all_forecast_latest
 
 from forecast_blend.blend import get_blend_forecast_values_latest
-from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values, format_metadata
+from forecast_blend.utils import get_start_datetime, convert_df_to_list_forecast_values
 from forecast_blend.weights import (
     ALL_MODEL_NAMES,
     backfill_weights, 

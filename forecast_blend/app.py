@@ -44,7 +44,7 @@ from forecast_blend.weights import (
     get_national_blend_weights, 
     get_regional_blend_weights,
 )
-from forecast_blend.save import fetch_dp_gsp_uuid_map, save_forecast_to_data_platform
+from forecast_blend.save import fetch_dp_gsp_uuid_map, save_forecast_to_data_platform, get_metadata
 from forecast_blend.forecast.data_platform import read_from_data_platform, get_data_platform_connection
 import pandas as pd
 
@@ -175,8 +175,6 @@ async def app(gsps: list[int] | None = None) -> None:
                 update_gsp=True,
             )
 
-        metadata = format_metadata(forecasts[0].input_data_last_updated)
-
     # save to dataplatform
     logger.info("Saving forecast to data platform")
     channel = Channel(
@@ -188,6 +186,7 @@ async def app(gsps: list[int] | None = None) -> None:
         client = dp.DataPlatformDataServiceStub(channel)
         
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+        metadata = await get_metadata(client=client, location_uuid=gsp_uuid_map[0]["location_uuid"])
         _ = await save_forecast_to_data_platform(
             forecast_values_by_gsp_id=forecast_values_by_gsp_id,
             locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,

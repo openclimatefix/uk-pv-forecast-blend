@@ -7,11 +7,12 @@ from datetime import UTC, datetime
 
 import betterproto
 import pandas as pd
-from betterproto.lib.google.protobuf import Struct
+from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 
 
 logger = logging.getLogger(__name__)
+
 
 async def save_forecast_to_data_platform(
     forecast_values_by_gsp_id: dict[int, pd.DataFrame],
@@ -19,7 +20,7 @@ async def save_forecast_to_data_platform(
     model_tag: str,
     init_time_utc: datetime,
     client: dp.DataPlatformDataServiceStub,
-    metadata: None | Struct = None
+    metadata: None | Struct = None,
 ) -> None:
     """Save forecast DataArray to data platform.
 
@@ -42,7 +43,9 @@ async def save_forecast_to_data_platform(
     init_time_utc = init_time_utc.replace(tzinfo=None)
 
     # 1. get or update or create forecaster version ( this is similar to ml_model before)
-    forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag)
+    forecaster = await create_forecaster_if_not_exists(
+        client=client, model_tag=model_tag
+    )
 
     # 2. now loop over all gsps
     logger.debug("Processing forecasts for Data Platform")
@@ -52,36 +55,45 @@ async def save_forecast_to_data_platform(
         forecast_values = map_values_df_to_dp_requests(
             forecast_values_by_gsp_id[gsp_id],
             init_time_utc=init_time_utc,
-            capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id]["effective_capacity_watts"],
+            capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id][
+                "effective_capacity_watts"
+            ],
         )
         # 4. Save to data platform
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
-            location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id]["location_uuid"],
+            location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id][
+                "location_uuid"
+            ],
             energy_source=dp.EnergySource.SOLAR,
             init_time_utc=init_time_utc.replace(tzinfo=UTC),
             values=forecast_values,
-            metadata=metadata
+            metadata=metadata,
         )
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
         # 5. save adjusted if gsp_id=0
         if gsp_id == 0:
-
             forecast_values = map_values_df_to_dp_requests(
-            forecast_values_by_gsp_id[gsp_id],
-            init_time_utc=init_time_utc,
-            capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id]["effective_capacity_watts"],
-            use_adjuster=True,
-        )
-            forecaster_adjust = await create_forecaster_if_not_exists(client=client, model_tag=model_tag+"_adjust")
+                forecast_values_by_gsp_id[gsp_id],
+                init_time_utc=init_time_utc,
+                capacity_watts=locations_uuid_and_capacity_by_gsp_id[gsp_id][
+                    "effective_capacity_watts"
+                ],
+                use_adjuster=True,
+            )
+            forecaster_adjust = await create_forecaster_if_not_exists(
+                client=client, model_tag=model_tag + "_adjust"
+            )
             forecast_request = dp.CreateForecastRequest(
                 forecaster=forecaster_adjust,
-                location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id]["location_uuid"],
+                location_uuid=locations_uuid_and_capacity_by_gsp_id[gsp_id][
+                    "location_uuid"
+                ],
                 energy_source=dp.EnergySource.SOLAR,
                 init_time_utc=init_time_utc.replace(tzinfo=UTC),
                 values=forecast_values,
-                metadata=metadata
+                metadata=metadata,
             )
             tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
@@ -97,7 +109,7 @@ def map_values_df_to_dp_requests(
     forecast_values_df: pd.DataFrame,
     init_time_utc: datetime,
     capacity_watts: int,
-    use_adjuster: bool = False
+    use_adjuster: bool = False,
 ) -> list[dp.CreateForecastRequestForecastValue]:
     """Convert a Dataframe for a single GSP to a list of ForecastValue objects.
 
@@ -114,37 +126,40 @@ def map_values_df_to_dp_requests(
     """
 
     # create horizon mins
-    target_datetime_utc = pd.to_datetime(forecast_values_df['target_datetime_utc'].values)
+    target_datetime_utc = pd.to_datetime(
+        forecast_values_df["target_datetime_utc"].values
+    )
     horizons_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
     horizons_mins = horizons_mins.astype(int)
 
     # get adjuster values
     if use_adjuster:
-        for p_col in ['p10_mw', 'p50_mw', 'p90_mw']:
+        for p_col in ["p10_mw", "p50_mw", "p90_mw"]:
             if p_col in forecast_values_df.columns:
-                forecast_values_df[p_col] = forecast_values_df[p_col] - forecast_values_df['adjust_mw']
+                forecast_values_df[p_col] = (
+                    forecast_values_df[p_col] - forecast_values_df["adjust_mw"]
+                )
                 forecast_values_df[p_col] = forecast_values_df[p_col].clip(lower=0)
 
     # Reduce singular dimensions
-    p50s = forecast_values_df['p50_mw'].values.astype(float)
-    p50s = p50s * 1*10**6 / float(capacity_watts)
-    
+    p50s = forecast_values_df["p50_mw"].values.astype(float)
+    p50s = p50s * 1 * 10**6 / float(capacity_watts)
+
     # add p10s and p90s if they exist
-    if 'p10_mw' in forecast_values_df.columns:
-        p10s = forecast_values_df['p10_mw'].values.astype(float) 
-        p10s = p10s * 1*10**6 / float(capacity_watts)
+    if "p10_mw" in forecast_values_df.columns:
+        p10s = forecast_values_df["p10_mw"].values.astype(float)
+        p10s = p10s * 1 * 10**6 / float(capacity_watts)
     else:
-        p10s = [None]*len(p50s)
-    if 'p90_mw' in forecast_values_df.columns:
-        p90s = forecast_values_df['p90_mw'].values.astype(float)
-        p90s = p90s * 1*10**6 / float(capacity_watts)
+        p10s = [None] * len(p50s)
+    if "p90_mw" in forecast_values_df.columns:
+        p90s = forecast_values_df["p90_mw"].values.astype(float)
+        p90s = p90s * 1 * 10**6 / float(capacity_watts)
     else:
-        p90s = [None]*len(p50s)
+        p90s = [None] * len(p50s)
 
     forecast_values = []
     for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
-        
-        if h <0:
+        if h < 0:
             # skip negative horizons
             continue
 
@@ -159,25 +174,26 @@ def map_values_df_to_dp_requests(
                 horizon_mins=h,
                 p50_fraction=p50,
                 metadata=Struct().from_pydict({}),
-                other_statistics_fractions=other_statistics_fractions
+                other_statistics_fractions=other_statistics_fractions,
             ),
         )
 
     return forecast_values
 
 
-
 async def fetch_dp_gsp_uuid_map(
     client: dp.DataPlatformDataServiceStub,
-) -> dict[int, dict[str, int|str]]:
+) -> dict[int, dict[str, int | str]]:
     """Fetch all GSP locations from data platform and map to their uuids."""
     tasks = [
-        asyncio.create_task(client.list_locations(
-            dp.ListLocationsRequest(
-                location_type_filter=loc_type,
-                energy_source_filter=dp.EnergySource.SOLAR,
-            ),
-        ))
+        asyncio.create_task(
+            client.list_locations(
+                dp.ListLocationsRequest(
+                    location_type_filter=loc_type,
+                    energy_source_filter=dp.EnergySource.SOLAR,
+                ),
+            )
+        )
         for loc_type in [dp.LocationType.GSP, dp.LocationType.NATION]
     ]
     list_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -187,19 +203,27 @@ async def fetch_dp_gsp_uuid_map(
     locations_df = (
         # Convert and combine the location lists from the responses into a single DataFrame
         pd.DataFrame.from_dict(
-            itertools.chain(*[
-                r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)["locations"]
-                for r in list_results],
+            itertools.chain(
+                *[
+                    r.to_dict(
+                        casing=betterproto.Casing.SNAKE, include_default_values=True
+                    )["locations"]
+                    for r in list_results
+                ],
             ),
         )
         # Filter the returned locations to those with a gsp_id in the metadata; extract it
         .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
-        .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: int(x["gsp_id"]["number_value"])))
+        .assign(
+            gsp_id=lambda df: df["metadata"].apply(
+                lambda x: int(x["gsp_id"]["number_value"])
+            )
+        )
         .set_index("gsp_id", drop=False, inplace=False)
     )
 
     # reduce to the columns we need
-    locations_df = locations_df[["location_uuid","effective_capacity_watts"]]
+    locations_df = locations_df[["location_uuid", "effective_capacity_watts"]]
 
     # change to dict
     return locations_df.to_dict(orient="index")
@@ -220,7 +244,9 @@ async def create_forecaster_if_not_exists(
 
     if len(list_forecasters_response.forecasters) > 0:
         filtered_forecasters = [
-            f for f in list_forecasters_response.forecasters if f.forecaster_version == version
+            f
+            for f in list_forecasters_response.forecasters
+            if f.forecaster_version == version
         ]
         if len(filtered_forecasters) == 1:
             # Forecaster exists, return it
@@ -231,7 +257,9 @@ async def create_forecaster_if_not_exists(
                 name=name,
                 new_version=version,
             )
-            update_forecaster_response = await client.update_forecaster(update_forecaster_request)
+            update_forecaster_response = await client.update_forecaster(
+                update_forecaster_request
+            )
             return update_forecaster_response.forecaster
     else:
         # Forecaster does not exist, create it
@@ -239,6 +267,53 @@ async def create_forecaster_if_not_exists(
             name=name,
             version=version,
         )
-        create_forecaster_response = await client.create_forecaster(create_forecaster_request)
+        create_forecaster_response = await client.create_forecaster(
+            create_forecaster_request
+        )
         return create_forecaster_response.forecaster
 
+
+async def get_metadata(
+    client: dp.DataPlatformDataServiceStub, location_uuid: str
+) -> Struct:
+    """Fetch metadata from data platform."""
+    request = dp.GetLatestForecastsRequest(
+        location_uuid=location_uuid,
+        energy_source=dp.EnergySource.SOLAR,
+    )
+    response = await client.get_latest_forecasts(request)
+    forecasts = response.forecasts
+
+    # now need to get the maximum gsp, nwp and satellite last_updated times
+    old = datetime(1970, 1, 1, tzinfo=UTC)
+
+    metadata_dict = {
+        "gsp_last_updated": old,
+        "nwp_last_updated": old,
+        "satellite_last_updated": old,
+    }
+
+    # loop over all forecasts
+    for forecast in forecasts:
+        # loop over all metadata fields
+        for name in ["gsp", "nwp", "satellite"]:
+            name_last_updated = f"{name}_last_updated"
+
+            # find out if there is a later datestamps, and lets save it
+            metadata_dict[name_last_updated] = max(
+                [
+                    datetime.fromisoformat(v.string_value)
+                    for k, v in forecast.metadata.fields.items()
+                    if name in k
+                ]
+                + [metadata_dict[name_last_updated]]
+            )
+
+    # format the metadata with Value
+    for name in ["gsp", "nwp", "satellite"]:
+        name_last_updated = f"{name}_last_updated"
+        metadata_dict[name_last_updated] = Value(
+            string_value=metadata_dict[name_last_updated].isoformat()
+        )
+
+    return Struct(fields=metadata_dict)

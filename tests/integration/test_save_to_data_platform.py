@@ -202,7 +202,7 @@ async def test_get_metadata(client):
         },
     )
 
-    # Test the functyion
+    # save a forecast
     _ = await save_forecast_to_data_platform(
         forecast_values_by_gsp_id={0: fake_data},
         locations_uuid_and_capacity_by_gsp_id={0: {'location_uuid': location_uuid, 'effective_capacity_watts': 1_000_000}},
@@ -212,9 +212,10 @@ async def test_get_metadata(client):
         metadata=Struct(fields={"nwp_last_updated": Value(string_value=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC).isoformat())})
     )
 
-
     # check: metadata is correct
     metadata = await get_metadata(client=client, location_uuid=location_uuid)
+
+    # checks
     metadata = metadata.fields
     assert "gsp_last_updated" in metadata.keys()
     assert metadata["gsp_last_updated"].string_value == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()

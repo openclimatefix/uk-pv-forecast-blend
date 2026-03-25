@@ -3,12 +3,14 @@
 import asyncio
 import itertools
 import logging
+import json
 from datetime import UTC, datetime
 
 import betterproto
 import pandas as pd
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
+from importlib.metadata import version
 
 
 logger = logging.getLogger(__name__)
@@ -315,5 +317,18 @@ async def get_metadata(
         metadata_dict[name_last_updated] = Value(
             string_value=metadata_dict[name_last_updated].isoformat()
         )
+
+
+    version_dict = {"blend": version("uk-pv-forecast-blend")}
+    # now lets also set the app_version
+    for forecast in forecasts:
+        version = forecast.forecaster.forecaster_version
+        name = forecast.forecaster.forecaster_name
+        if name in ['pvnet_day_ahead', "pvnet_v2", "pvnet_ecmwf"]:
+            version_dict[name] = version
+
+    version = json.dumps(version_dict)
+    metadata_dict['app_version'] = Value(string_value=version)
+
 
     return Struct(fields=metadata_dict)

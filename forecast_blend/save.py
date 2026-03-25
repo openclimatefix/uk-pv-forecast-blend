@@ -323,6 +323,8 @@ async def get_metadata(
     # now lets also set the app_version
     for forecast in forecasts:
         f_version = forecast.forecaster.forecaster_version
+        if "app_version" in forecast.metadata.fields:
+            f_version = forecast.metadata.fields["app_version"].string_value
         name = forecast.forecaster.forecaster_name
         if name in ['pvnet_day_ahead', "pvnet_v2", "pvnet_ecmwf"]:
             version_dict[name] = f_version

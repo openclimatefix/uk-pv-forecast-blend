@@ -3,7 +3,6 @@ import time
 
 import pandas as pd
 import pytest
-from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
 import pytest_asyncio
@@ -61,7 +60,7 @@ async def test_save_to_generation_to_data_platform(client):
     is running and can accept data.
     """
     # setup: add location - gsp 0
-    metadata = Struct(fields={"gsp_id": Value(number_value=0)})
+    metadata: dict[str, str] = {"gsp_id": "0"}
     create_location_request = dp.CreateLocationRequest(
         location_name="gsp0",
         energy_source=dp.EnergySource.SOLAR,
@@ -97,7 +96,7 @@ async def test_save_to_generation_to_data_platform(client):
         client=client,
         model_tag="test_model",
         init_time_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
-        metadata=Struct(fields={"test_key": Value(string_value="test_value")})
+        metadata={"test_key": "test_value"}
     )
 
     # check: read from the data platform to check it was saved
@@ -116,7 +115,7 @@ async def test_save_to_generation_to_data_platform(client):
     assert len(get_latest_forecasts_response.forecasts) == 2
     forecast = get_latest_forecasts_response.forecasts[0]
     assert forecast.forecaster.forecaster_name == "test_model"
-    assert forecast.metadata.fields["test_key"].string_value == "test_value"
+    assert forecast.metadata["test_key"] == "test_value"
     forecast_adjust = get_latest_forecasts_response.forecasts[1]
     assert forecast_adjust.forecaster.forecaster_name == "test_model_adjust"
 
@@ -143,7 +142,7 @@ async def test_save_to_generation_to_data_platform(client):
 async def test_get_metadata_no_forecasts(client):
 
     # setup: add location - gsp 1
-    metadata = Struct(fields={"gsp_id": Value(number_value=1)})
+    metadata = {"gsp_id": "1"}
     create_location_request = dp.CreateLocationRequest(
         location_name="gsp1",
         energy_source=dp.EnergySource.SOLAR,
@@ -158,13 +157,12 @@ async def test_get_metadata_no_forecasts(client):
 
     # check: metadata is correct
     metadata = await get_metadata(client=client, location_uuid=location_uuid)
-    metadata = metadata.fields
     assert "gsp_last_updated" in metadata.keys()
-    assert metadata["gsp_last_updated"].string_value == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
+    assert metadata["gsp_last_updated"] == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
     assert "nwp_last_updated" in metadata.keys()
-    assert metadata["nwp_last_updated"].string_value == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
+    assert metadata["nwp_last_updated"] == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
     assert "satellite_last_updated" in metadata.keys()
-    assert metadata["satellite_last_updated"].string_value == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
+    assert metadata["satellite_last_updated"] == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
 
 
 
@@ -172,7 +170,7 @@ async def test_get_metadata_no_forecasts(client):
 async def test_get_metadata(client):
 
     # setup: add location - gsp 2
-    metadata = Struct(fields={"gsp_id": Value(number_value=2)})
+    metadata = {"gsp_id": "2"}
     create_location_request = dp.CreateLocationRequest(
         location_name="gsp2",
         energy_source=dp.EnergySource.SOLAR,
@@ -209,19 +207,18 @@ async def test_get_metadata(client):
         client=client,
         model_tag="test_model",
         init_time_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
-        metadata=Struct(fields={"nwp_last_updated": Value(string_value=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC).isoformat())})
+        metadata={"nwp_last_updated": datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC).isoformat()}
     )
 
     # check: metadata is correct
     metadata = await get_metadata(client=client, location_uuid=location_uuid)
 
     # checks
-    metadata = metadata.fields
     assert "gsp_last_updated" in metadata.keys()
-    assert metadata["gsp_last_updated"].string_value == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
+    assert metadata["gsp_last_updated"] == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
     assert "nwp_last_updated" in metadata.keys()
     # this one has been changed
-    assert metadata["nwp_last_updated"].string_value == datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC).isoformat()
+    assert metadata["nwp_last_updated"] == datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC).isoformat()
     assert "satellite_last_updated" in metadata.keys()
-    assert metadata["satellite_last_updated"].string_value == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
+    assert metadata["satellite_last_updated"] == datetime.datetime(1970, 1, 1, tzinfo=datetime.UTC).isoformat()
 

@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 
 import betterproto
 import pandas as pd
-from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from importlib.metadata import version
 
@@ -22,7 +21,7 @@ async def save_forecast_to_data_platform(
     model_tag: str,
     init_time_utc: datetime,
     client: dp.DataPlatformDataServiceStub,
-    metadata: None | Struct = None,
+    metadata: dict[str, str],
 ) -> None:
     """Save forecast DataArray to data platform.
 
@@ -175,7 +174,6 @@ def map_values_df_to_dp_requests(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
                 p50_fraction=p50,
-                metadata=Struct().from_pydict({}),
                 other_statistics_fractions=other_statistics_fractions,
             ),
         )
@@ -277,7 +275,7 @@ async def create_forecaster_if_not_exists(
 
 async def get_metadata(
     client: dp.DataPlatformDataServiceStub, location_uuid: str
-) -> Struct:
+) -> dict[str, str]:
     """Fetch metadata from data platform."""
     request = dp.GetLatestForecastsRequest(
         location_uuid=location_uuid,
@@ -287,9 +285,9 @@ async def get_metadata(
     forecasts = response.forecasts
 
     # now need to get the maximum gsp, nwp and satellite last_updated times
-    old = datetime(1970, 1, 1, tzinfo=UTC)
+    old = datetime(1970, 1, 1, tzinfo=UTC).isoformat(timespec="seconds")
 
-    metadata_dict = {
+    metadata_dict: dict[str, str] = {
         "gsp_last_updated": old,
         "nwp_last_updated": old,
         "satellite_last_updated": old,
@@ -302,22 +300,16 @@ async def get_metadata(
             name_last_updated = f"{name}_last_updated"
 
             # find out if there is a later datestamps, and lets save it
-            metadata_dict[name_last_updated] = max(
+            latest_date: datetime = max(
                 [
                     datetime.fromisoformat(v.string_value)
                     for k, v in forecast.metadata.fields.items()
                     if name in k
+                ] + [
+                    datetime.fromisoformat(metadata_dict[name_last_updated])
                 ]
-                + [metadata_dict[name_last_updated]]
             )
-
-    # format the metadata with Value
-    for name in ["gsp", "nwp", "satellite"]:
-        name_last_updated = f"{name}_last_updated"
-        metadata_dict[name_last_updated] = Value(
-            string_value=metadata_dict[name_last_updated].isoformat()
-        )
-
+            metadata_dict[name_last_updated] = latest_date.isoformat(timespec="seconds")
 
     version_dict = {"blend": version("uk-pv-forecast-blend")}
     # now lets also set the app_version
@@ -330,7 +322,7 @@ async def get_metadata(
             version_dict[name] = f_version
 
     version_str = json.dumps(version_dict)
-    metadata_dict['app_version'] = Value(string_value=version_str)
+    metadata_dict['app_version'] = version_str
 
 
-    return Struct(fields=metadata_dict)
+    return metadata_dict

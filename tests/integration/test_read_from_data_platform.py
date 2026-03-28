@@ -12,7 +12,6 @@ import time
 
 import pandas as pd
 import pytest
-from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
 import pytest_asyncio
@@ -78,7 +77,7 @@ async def setup_test_data(dp_client):
     client, host, port = dp_client
 
     # Create test location for GSP 0 (national)
-    metadata_gsp0 = Struct(fields={"gsp_id": Value(number_value=0)})
+    metadata_gsp0 = {"gsp_id": "0"}
     create_location_request = dp.CreateLocationRequest(
         location_name="test_national_gsp",
         energy_source=dp.EnergySource.SOLAR,
@@ -92,7 +91,7 @@ async def setup_test_data(dp_client):
     location_uuid_gsp0 = response.location_uuid
 
     # Create test location for GSP 1 (regional)
-    metadata_gsp1 = Struct(fields={"gsp_id": Value(number_value=1)})
+    metadata_gsp1 = {"gsp_id": "1"}
     create_location_request = dp.CreateLocationRequest(
         location_name="test_regional_gsp_1",
         energy_source=dp.EnergySource.SOLAR,
@@ -158,7 +157,6 @@ async def create_test_forecast(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=horizon_mins,
                 p50_fraction=p50_fraction,
-                metadata=Struct(),
                 other_statistics_fractions=other_stats,
             )
         )

@@ -149,7 +149,29 @@ async def app(gsps: list[int] | None = None) -> None:
         if dp_channel is not None:
             dp_channel.close()
 
-        # 3. save to database
+        # 3.1 save to dataplatform
+        logger.info("Saving forecast to data platform")
+        channel = Channel(
+            os.getenv("DATA_PLATFORM_HOST", "localhost"),
+            int(os.getenv("DATA_PLATFORM_PORT", "50051")),
+        )
+
+        async with channel:
+            client = dp.DataPlatformDataServiceStub(channel)
+            
+            gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+            metadata = await get_metadata(client=client, location_uuid=gsp_uuid_map[0]["location_uuid"])
+            _ = await save_forecast_to_data_platform(
+                forecast_values_by_gsp_id=forecast_values_by_gsp_id,
+                locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
+                model_tag=blend_name,
+                init_time_utc=t0.to_pydatetime(),
+                client=client,
+                metadata=metadata,
+                )
+            channel.close()
+
+        # 3.2 save to database
         # save to forecast_value_latest table, and not to the
         # - forecast_value_last_seven_days
         # - forecast_value
@@ -175,28 +197,7 @@ async def app(gsps: list[int] | None = None) -> None:
                 update_gsp=True,
             )
 
-    # save to dataplatform
-    logger.info("Saving forecast to data platform")
-    channel = Channel(
-        os.getenv("DATA_PLATFORM_HOST", "localhost"),
-        int(os.getenv("DATA_PLATFORM_PORT", "50051")),
-    )
-
-    async with channel:
-        client = dp.DataPlatformDataServiceStub(channel)
-        
-        gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
-        metadata = await get_metadata(client=client, location_uuid=gsp_uuid_map[0]["location_uuid"])
-        _ = await save_forecast_to_data_platform(
-            forecast_values_by_gsp_id=forecast_values_by_gsp_id,
-            locations_uuid_and_capacity_by_gsp_id=gsp_uuid_map,
-            model_tag=blend_name,
-            init_time_utc=t0.to_pydatetime(),
-            client=client,
-            metadata=metadata,
-            )
-        channel.close()
-
+    
     logger.info("Finished")
 
 

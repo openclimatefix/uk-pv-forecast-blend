@@ -67,6 +67,7 @@ async def app(gsps: list[int] | None = None) -> None:
     """run main app"""
 
     blend_name = os.getenv("BLEND_NAME", "blend")
+    save_to_db = os.getenv("SAVE_TO_DB", "true").lower() == "true"
     allow_cloudcasting = os.getenv("ALLOW_CLOUDCASTING", "false").lower()=="true"
 
     exclude_models = None if allow_cloudcasting else ["pvnet_cloud"]
@@ -178,7 +179,9 @@ async def app(gsps: list[int] | None = None) -> None:
         # tables, as we will end up doubling the size of this table.
         assert len(forecasts) > 0, "No forecasts made"
         assert len(forecasts[0].forecast_values) > 0, "No forecast values sql made"
-        if is_last_forecast_made_before_last_30_minutes_step(session=session, blend_name=blend_name):
+        if not save_to_db:
+            logger.info("Skipping database save (SAVE_TO_DB=false)")
+        elif is_last_forecast_made_before_last_30_minutes_step(session=session, blend_name=blend_name):
             logger.debug(f"Saving {len(forecasts)} forecasts")
             save(
                 session=session,

@@ -20,7 +20,7 @@ def get_data_platform_connection() -> tuple[str, int]:
 async def fetch_dp_latest_forecasts(
     client: dp.DataPlatformDataServiceStub,
     location_uuid: str,
-) -> list:
+) -> list[dp.GetLatestForecastsResponseForecast]:
     """Fetch the latest forecasts list for a location (one call, all models)."""
     logger.debug(f"Fetching latest forecasts from Data Platform for location {location_uuid}")
     response = await client.get_latest_forecasts(
@@ -46,7 +46,7 @@ async def fetch_dp_forecast_values(
         f"for location {location_uuid} and model {model_name}"
     )
     if latest_forecasts is None:
-        latest_forecasts = await fetch_dp_latest_forecasts(client, location_uuid)
+        latest_forecasts = await fetch_dp_latest_forecasts(client=client, location_uuid=location_uuid)
 
     # Filter by model name (forecaster tag)
     matching_forecasts = [

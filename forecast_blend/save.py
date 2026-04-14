@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 import betterproto
 import pandas as pd
 from betterproto.lib.google.protobuf import Struct, Value
-from dp_sdk.ocf import dp
+from ocf import dp
 from importlib.metadata import version
 
 

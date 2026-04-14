@@ -13,7 +13,7 @@ import time
 import pandas as pd
 import pytest
 from betterproto.lib.google.protobuf import Struct, Value
-from dp_sdk.ocf import dp
+from ocf import dp
 from grpclib.client import Channel
 import pytest_asyncio
 from testcontainers.core.container import DockerContainer

@@ -20,14 +20,13 @@ from forecast_blend.utils import (
 )
 
 from forecast_blend.forecast.data_platform import (
-    get_forecast_values_from_data_platform, 
-    read_from_data_platform, 
-    get_data_platform_connection,
+    fetch_dp_latest_forecasts,
+    get_forecast_values_from_data_platform,
+    read_from_data_platform,
 )
 from forecast_blend.forecast.database import get_forecast_values_from_db
 
-from grpclib.client import Channel
-from dp_sdk.ocf import dp
+from ocf import dp
 
 
 async def get_blend_forecast_values_latest(
@@ -68,52 +67,42 @@ async def get_blend_forecast_values_latest(
     forecast_values_all_model_dfs = []
     if read_from_data_platform():
 
-        # Use passed-in client and map, or create new ones if not provided
-        client = dp_client
-        local_channel = None
-        if client is None:
-            host, port = get_data_platform_connection()
-            local_channel = Channel(host=host, port=port)
-            client = dp.DataPlatformDataServiceStub(local_channel)
+        uuid_map = gsp_uuid_map
+        if uuid_map is None:
+            uuid_map = await fetch_dp_gsp_uuid_map(dp_client)
 
-        try:
-            # Use passed-in map or fetch it
-            uuid_map = gsp_uuid_map
-            if uuid_map is None:
-                uuid_map = await fetch_dp_gsp_uuid_map(client)
+        if gsp_id not in uuid_map:
+            raise ValueError(f"GSP {gsp_id} not found in Data Platform")
 
-            if gsp_id not in uuid_map:
-                raise ValueError(f"GSP {gsp_id} not found in Data Platform")
+        location_uuid = uuid_map[gsp_id]["location_uuid"]
 
-            location_uuid = uuid_map[gsp_id]["location_uuid"]
+        # One get_latest_forecasts call per gsp_id, shared across all models and the adjuster lookup.
+        latest_forecasts = await fetch_dp_latest_forecasts(dp_client, location_uuid)
 
-            tasks = [
-                get_forecast_values_from_data_platform(
-                    client=client,
-                    location_uuid=location_uuid,
-                    model_name=model_name,
-                    start_datetime=start_datetime,
-                    gsp_id=gsp_id,
+        tasks = [
+            get_forecast_values_from_data_platform(
+                client=dp_client,
+                location_uuid=location_uuid,
+                model_name=model_name,
+                start_datetime=start_datetime,
+                gsp_id=gsp_id,
+                latest_forecasts=latest_forecasts,
+            )
+            for model_name in model_names
+        ]
+
+        results = await asyncio.gather(*tasks)
+
+        # Results are DataFrames, collect non-empty ones
+        for df in results:
+            if len(df) > 0:
+                forecast_values_all_model_dfs.append(df)
+            else:
+                model_name = df["model_name"].iloc[0] if len(df) > 0 else "unknown"
+                logger.debug(
+                    f"No forecast values for {model_name} "
+                    f"for gsp_id {gsp_id}"
                 )
-                for model_name in model_names
-            ]
-
-            results = await asyncio.gather(*tasks)
-
-            # Results are DataFrames, collect non-empty ones
-            for df in results:
-                if len(df) > 0:
-                    forecast_values_all_model_dfs.append(df)
-                else:
-                    model_name = df["model_name"].iloc[0] if len(df) > 0 else "unknown"
-                    logger.debug(
-                        f"No forecast values for {model_name} "
-                        f"for gsp_id {gsp_id}"
-                    )
-        finally:
-            # Close the channel only if we created it locally
-            if local_channel is not None:
-                local_channel.close()
 
         # Concatenate all DataFrames
         if forecast_values_all_model_dfs:

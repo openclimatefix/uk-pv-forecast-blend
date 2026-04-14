@@ -4,7 +4,7 @@ import os
 import asyncio
 import pytest
 import pytest_asyncio
-from dp_sdk.ocf import dp
+from ocf import dp
 from betterproto.lib.google.protobuf import Struct, Value
 from grpclib.client import Channel
 

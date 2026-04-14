@@ -9,7 +9,7 @@ from datetime import timezone
 from loguru import logger
 
 from grpclib.client import Channel
-from dp_sdk.ocf import dp
+from ocf import dp
 
 from sqlalchemy.orm import Session
 from nowcasting_datamodel.models import ForecastSQL, MLModelSQL

@@ -14,7 +14,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 import sentry_sdk
 from loguru import logger
-from dp_sdk.ocf import dp
+from ocf import dp
 from grpclib.client import Channel
 
 

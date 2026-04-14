@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta, timezone
 import pandas as pd
 from loguru import logger
-from dp_sdk.ocf import dp
+from ocf import dp
 
 def read_from_data_platform() -> bool:
     """Check if we should read from Data Platform instead of database."""
@@ -17,30 +17,40 @@ def get_data_platform_connection() -> tuple[str, int]:
     port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
     return host, port
 
-async def fetch_dp_forecast_values(
+async def fetch_dp_latest_forecasts(
     client: dp.DataPlatformDataServiceStub,
     location_uuid: str,
-    model_name: str,
-    start_datetime: datetime | None,
-):
-    """Fetch forecast values from Data Platform for a specific location and model."""
-    logger.debug(
-        f"Fetching forecasts from Data Platform "
-        f"for location {location_uuid} and model {model_name}"
-    )
-    # Get the latest forecasts for this location
+) -> list[dp.GetLatestForecastsResponseForecast]:
+    """Fetch the latest forecasts list for a location (one call, all models)."""
+    logger.debug(f"Fetching latest forecasts from Data Platform for location {location_uuid}")
     response = await client.get_latest_forecasts(
         dp.GetLatestForecastsRequest(
             location_uuid=location_uuid,
             energy_source=dp.EnergySource.SOLAR,
         )
     )
-
     logger.debug(f"Received {len(response.forecasts)} forecasts from Data Platform")
+    return list(response.forecasts)
+
+
+async def fetch_dp_forecast_values(
+    client: dp.DataPlatformDataServiceStub,
+    location_uuid: str,
+    model_name: str,
+    start_datetime: datetime | None,
+    latest_forecasts: list | None = None,
+):
+    """Fetch forecast values from Data Platform for a specific location and model."""
+    logger.debug(
+        f"Fetching forecasts from Data Platform "
+        f"for location {location_uuid} and model {model_name}"
+    )
+    if latest_forecasts is None:
+        latest_forecasts = await fetch_dp_latest_forecasts(client=client, location_uuid=location_uuid)
 
     # Filter by model name (forecaster tag)
     matching_forecasts = [
-        f for f in response.forecasts if f.forecaster.forecaster_name == model_name
+        f for f in latest_forecasts if f.forecaster.forecaster_name == model_name
     ]
 
     if not matching_forecasts:
@@ -88,6 +98,7 @@ async def get_forecast_values_from_data_platform(
     model_name: str,
     start_datetime: datetime | None,
     gsp_id: int,
+    latest_forecasts: list | None = None,
 ) -> pd.DataFrame:
     """Get forecast values from Data Platform.
 
@@ -107,11 +118,15 @@ async def get_forecast_values_from_data_platform(
         f"model {model_name}, start_datetime {start_datetime}"
     )
 
+    if latest_forecasts is None:
+        latest_forecasts = await fetch_dp_latest_forecasts(client, location_uuid)
+
     dp_values = await fetch_dp_forecast_values(
         client=client,
         location_uuid=location_uuid,
         model_name=model_name,
         start_datetime=start_datetime,
+        latest_forecasts=latest_forecasts,
     )
 
     if not dp_values:
@@ -136,6 +151,7 @@ async def get_forecast_values_from_data_platform(
             location_uuid=location_uuid,
             model_name=adjuster_model_name,
             start_datetime=start_datetime,
+            latest_forecasts=latest_forecasts,
         )
         for v in adjuster_values:
             target_time = v.target_timestamp_utc.replace(microsecond=0)

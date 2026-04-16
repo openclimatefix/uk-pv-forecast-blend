@@ -4,7 +4,7 @@ import asyncio
 import numpy as np
 import os
 import pandas as pd
-from typing import Callable
+from typing import Awaitable, Callable
 from datetime import timezone
 from loguru import logger
 
@@ -84,11 +84,34 @@ def get_latest_forecast_metadata(
     return pd.read_sql(query.statement, session.bind)
 
 
+async def _list_national_locations(client: dp.DataPlatformDataServiceStub) -> list:
+    """List solar NATION locations from the Data Platform."""
+    response = await client.list_locations(
+        dp.ListLocationsRequest(
+            energy_source_filter=dp.EnergySource.SOLAR,
+            location_type_filter=dp.LocationType.NATION,
+        )
+    )
+    return response.locations
+
+
+async def _list_gsp_locations(client: dp.DataPlatformDataServiceStub) -> list:
+    """List solar GSP locations from the Data Platform."""
+    response = await client.list_locations(
+        dp.ListLocationsRequest(
+            energy_source_filter=dp.EnergySource.SOLAR,
+            location_type_filter=dp.LocationType.GSP,
+        )
+    )
+    return response.locations
+
+
 async def _fetch_latest_forecast_metadata_from_dp(
     client: dp.DataPlatformDataServiceStub,
     model_names: list[str],
     t0: pd.Timestamp,
     max_delay: pd.Timedelta,
+    list_locations_fn: Callable[[dp.DataPlatformDataServiceStub], Awaitable[list]],
 ) -> pd.DataFrame:
 
     """Gets the most recent forecast metadata from Data Platform.
@@ -97,6 +120,8 @@ async def _fetch_latest_forecast_metadata_from_dp(
         model_names: List of model names (forecaster tags) to filter to
         t0: The blend forecast init-time
         max_delay: Max delay with respect to t0 to consider using forecast in the blend
+        list_locations_fn: Async function returning the locations to fetch forecasts for
+            (e.g. `_list_national_locations` or `_list_gsp_locations`)
 
     Returns:
         A pandas DataFrame with columns 'created_utc', 'forecast_creation_time',
@@ -107,13 +132,8 @@ async def _fetch_latest_forecast_metadata_from_dp(
     t0_datetime = t0.to_pydatetime().replace(tzinfo=timezone.utc)
     earliest_creation_time = t0_datetime - max_delay
 
+    locations = await list_locations_fn(client)
 
-    # Get all locations
-    locations_response = await client.list_locations(
-        dp.ListLocationsRequest(
-            energy_source_filter=dp.EnergySource.SOLAR,
-        )
-    )
     tasks = [
         asyncio.create_task(
             client.get_latest_forecasts(
@@ -123,7 +143,7 @@ async def _fetch_latest_forecast_metadata_from_dp(
                 )
             )
         )
-        for location in locations_response.locations
+        for location in locations
     ]
 
     responses = await asyncio.gather(*tasks, return_exceptions=True)
@@ -164,6 +184,7 @@ async def get_latest_forecast_metadata_with_switch(
     model_names: list[str],
     t0: pd.Timestamp,
     max_delay: pd.Timedelta,
+    location_type: str,
 ) -> pd.DataFrame:
     """Get latest forecast metadata from either DB or Data Platform based on switch.
 
@@ -172,11 +193,22 @@ async def get_latest_forecast_metadata_with_switch(
         model_names: List of model names to filter to
         t0: The blend forecast init-time
         max_delay: Max delay with respect to t0 to consider using forecast in the blend
+        location_type: "national" or "regional" — selects which locations to list
+            when reading from Data Platform.
 
     Returns:
         A pandas DataFrame with forecast metadata
     """
     if read_from_data_platform():
+        if location_type == "national":
+            list_locations_fn = _list_national_locations
+        elif location_type == "regional":
+            list_locations_fn = _list_gsp_locations
+        else:
+            raise ValueError(
+                f"Unknown location_type: {location_type!r}. Expected 'national' or 'regional'."
+            )
+
         host, port = get_data_platform_connection()
 
         async with Channel(host=host, port=port) as channel:
@@ -187,6 +219,7 @@ async def get_latest_forecast_metadata_with_switch(
                 model_names=model_names,
                 t0=t0,
                 max_delay=max_delay,
+                list_locations_fn=list_locations_fn,
             )
     else:
         logger.info("Reading forecast metadata from database")
@@ -485,6 +518,7 @@ async def get_national_blend_weights(
         model_names=all_model_names, 
         t0=t0, 
         max_delay=max_horizon,
+        location_type="national",
     )
     model_delays_dict = get_model_delays(df_latest_forecast_ids, t0)
     
@@ -588,6 +622,7 @@ async def get_regional_blend_weights(
         model_names=all_regional_models, 
         t0=t0, 
         max_delay=max_horizon,
+        location_type="regional",
     )
     model_delays_dict = get_model_delays(df_latest_forecast_ids, t0)
     

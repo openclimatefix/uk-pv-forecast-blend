@@ -24,7 +24,10 @@ from forecast_blend.forecast.data_platform import (
     fetch_dp_forecast_values,
     get_forecast_values_from_data_platform
 )
-from forecast_blend.weights import _fetch_latest_forecast_metadata_from_dp
+from forecast_blend.weights import (
+    _fetch_latest_forecast_metadata_from_dp,
+    _list_gsp_locations,
+)
 
 
 @pytest.fixture
@@ -211,6 +214,7 @@ async def test_read_forecast_metadata_from_data_platform(
         model_names=["pvnet_day_ahead"],
         t0=t0,
         max_delay=max_delay,
+        list_locations_fn=_list_gsp_locations,
     )
 
     # Verify results

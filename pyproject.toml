@@ -12,7 +12,6 @@ authors = [
     {name = "Open Climate Fix", email = "info@openclimatefix.org"},
 ]
 dependencies = [
-    "nowcasting_datamodel==1.7.1",
     "numpy",
     "pandas",
     "xarray",

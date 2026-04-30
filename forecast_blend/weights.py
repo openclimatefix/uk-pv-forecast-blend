@@ -11,10 +11,7 @@ from loguru import logger
 from grpclib.client import Channel
 from ocf import dp
 
-from sqlalchemy.orm import Session
-from nowcasting_datamodel.models import ForecastSQL, MLModelSQL
-
-from forecast_blend.forecast.data_platform import read_from_data_platform, get_data_platform_connection
+from forecast_blend.forecast.data_platform import get_data_platform_connection
 
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]
@@ -36,52 +33,6 @@ def get_horizon_maes() -> pd.DataFrame:
     df_maes = pd.read_csv(filepath, index_col=0).reset_index(names="horizon")
     df_maes["horizon"] = pd.to_timedelta(df_maes["horizon"]).to_numpy()
     return df_maes.set_index("horizon")
-
-
-def get_latest_forecast_metadata(
-    session: Session, 
-    model_names: list[str], 
-    t0: pd.Timestamp, 
-    max_delay: pd.Timedelta,
-) -> pd.DataFrame:
-    """Gets the most recent forecast IDs and creation times for specified models for each location.
-
-    Args:
-        session: Database session
-        model_names: List of model names to filter to
-        t0: The blend forecast init-time
-        max_delay: Max delay with respect to t0 to consider using forecast in the blend
-
-    Returns:
-        A pandas DataFrame with columns 'created_utc', 'id', 'forecast_creation_time',
-        'location_id', and 'name' (model name) representing the latest forecasts for each
-        (location, model) combination
-    """
-
-    t0_datetime = t0.to_pydatetime().replace(tzinfo=timezone.utc)
-    earliest_creation_time = t0_datetime - max_delay
-
-    # Define the columns we want to pull
-    forecast_columns = [
-        ForecastSQL.created_utc, 
-        ForecastSQL.id, 
-        ForecastSQL.forecast_creation_time, 
-        ForecastSQL.location_id,
-        MLModelSQL.name,
-    ]
-    
-    # Build query that joins the ForecastSQL and MLModelSQL tables, applies filters, 
-    # and takes the most recent row for each (model, location) pair
-    query = (
-        session.query(*forecast_columns)
-        .distinct(ForecastSQL.location_id, MLModelSQL.name)
-        .join(MLModelSQL, ForecastSQL.model_id == MLModelSQL.id)
-        .filter(ForecastSQL.created_utc >= earliest_creation_time)
-        .filter(MLModelSQL.name.in_(model_names))
-        .order_by(ForecastSQL.location_id, MLModelSQL.name, ForecastSQL.forecast_creation_time.desc())
-    )
-
-    return pd.read_sql(query.statement, session.bind)
 
 
 async def _list_national_locations(client: dp.DataPlatformDataServiceStub) -> list:
@@ -180,54 +131,42 @@ async def _fetch_latest_forecast_metadata_from_dp(
 
 
 async def get_latest_forecast_metadata_with_switch(
-    session: Session | None,
     model_names: list[str],
     t0: pd.Timestamp,
     max_delay: pd.Timedelta,
     location_type: str,
 ) -> pd.DataFrame:
-    """Get latest forecast metadata from either DB or Data Platform based on switch.
+    """Get latest forecast metadata from Data Platform.
 
     Args:
-        session: Database session (can be None if using Data Platform)
         model_names: List of model names to filter to
         t0: The blend forecast init-time
         max_delay: Max delay with respect to t0 to consider using forecast in the blend
         location_type: "national" or "regional" — selects which locations to list
-            when reading from Data Platform.
 
     Returns:
         A pandas DataFrame with forecast metadata
     """
-    if read_from_data_platform():
-        if location_type == "national":
-            list_locations_fn = _list_national_locations
-        elif location_type == "regional":
-            list_locations_fn = _list_gsp_locations
-        else:
-            raise ValueError(
-                f"Unknown location_type: {location_type!r}. Expected 'national' or 'regional'."
-            )
-
-        host, port = get_data_platform_connection()
-
-        async with Channel(host=host, port=port) as channel:
-            client = dp.DataPlatformDataServiceStub(channel)
-            logger.info("Reading forecast metadata from Data Platform")
-            return await _fetch_latest_forecast_metadata_from_dp(
-                client=client,
-                model_names=model_names,
-                t0=t0,
-                max_delay=max_delay,
-                list_locations_fn=list_locations_fn,
-            )
+    if location_type == "national":
+        list_locations_fn = _list_national_locations
+    elif location_type == "regional":
+        list_locations_fn = _list_gsp_locations
     else:
-        logger.info("Reading forecast metadata from database")
-        return get_latest_forecast_metadata(
-            session=session,
+        raise ValueError(
+            f"Unknown location_type: {location_type!r}. Expected 'national' or 'regional'."
+        )
+
+    host, port = get_data_platform_connection()
+
+    async with Channel(host=host, port=port) as channel:
+        client = dp.DataPlatformDataServiceStub(channel)
+        logger.info("Reading forecast metadata from Data Platform")
+        return await _fetch_latest_forecast_metadata_from_dp(
+            client=client,
             model_names=model_names,
             t0=t0,
             max_delay=max_delay,
+            list_locations_fn=list_locations_fn,
         )
 
 
@@ -251,8 +190,6 @@ def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[st
         .apply(_get_most_recent_row)
     )
     
-    # TODO: Use the saved forecast initialisation time when available
-    # https://github.com/openclimatefix/nowcasting_datamodel/issues/315
     # Approximate the forecast initialisation time
     df_forecast_ids["initialisation_datetime_utc"] = (
         df_forecast_ids["forecast_creation_time"].dt.floor("30min")
@@ -467,7 +404,6 @@ def calculate_optimal_blend_weights(
 
 
 async def get_national_blend_weights(
-    session: Session, 
     t0: pd.Timestamp, 
     exclude_models: list[str] | None = None,
 ) -> pd.DataFrame:
@@ -480,7 +416,6 @@ async def get_national_blend_weights(
     National_xg. We also choose up to one intraday model to blend into the day-ahead blend.
     
     Args:
-        session: The database session
         t0: The forecast initialisation time
         exclude_models: These models will not be included in the blend
 
@@ -512,9 +447,7 @@ async def get_national_blend_weights(
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
-    # Uses Data Platform or DB based on READ_FROM_DATA_PLATFORM env var
     df_latest_forecast_ids = await get_latest_forecast_metadata_with_switch(
-        session=session, 
         model_names=all_model_names, 
         t0=t0, 
         max_delay=max_horizon,
@@ -571,7 +504,6 @@ async def get_national_blend_weights(
 
 
 async def get_regional_blend_weights(
-    session: Session, 
     t0: pd.Timestamp, 
     exclude_models: list[str] = None,
 ) -> pd.DataFrame:
@@ -583,7 +515,6 @@ async def get_regional_blend_weights(
     We create a blend where up to one intraday model is blended into pvnet_day_ahead.
     
     Args:
-        session: The database session
         t0: The forecast initialisation time
         exclude_models: These models will not be included in the blend
 
@@ -616,9 +547,7 @@ async def get_regional_blend_weights(
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
-    # Uses Data Platform or DB based on READ_FROM_DATA_PLATFORM env var
     df_latest_forecast_ids = await get_latest_forecast_metadata_with_switch(
-        session=session, 
         model_names=all_regional_models, 
         t0=t0, 
         max_delay=max_horizon,

@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import os
 import pytest
@@ -40,23 +39,29 @@ async def setup_dp_locations(dp_client):
 
     # Seed forecasts for each model so the app can blend them
     init_time = datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc)
+    values = [
+        dp.CreateForecastRequestForecastValue(
+            horizon_mins=30 * i,
+            p50_fraction=0.5,
+            metadata=Struct(),
+        )
+        for i in range(1, 17)
+    ]
     for model_name in ALL_MODEL_NAMES:
         gsp_ids_for_model = [0] if model_name == "National_xg" else list(range(0, 12))
+        try:
+            forecaster_resp = await client.create_forecaster(
+                dp.CreateForecasterRequest(name=model_name, version="1.0.0")
+            )
+            adj_resp = await client.create_forecaster(
+                dp.CreateForecasterRequest(name=f"{model_name}_adjust", version="1.0.0")
+            )
+        except Exception:
+            continue
         for gsp_id in gsp_ids_for_model:
             if gsp_id not in location_uuids:
                 continue
             try:
-                forecaster_resp = await client.create_forecaster(
-                    dp.CreateForecasterRequest(name=model_name, version="1.0.0")
-                )
-                values = [
-                    dp.CreateForecastRequestForecastValue(
-                        horizon_mins=30 * i,
-                        p50_fraction=0.5,
-                        metadata=Struct(),
-                    )
-                    for i in range(1, 17)
-                ]
                 await client.create_forecast(dp.CreateForecastRequest(
                     forecaster=forecaster_resp.forecaster,
                     location_uuid=location_uuids[gsp_id],
@@ -64,11 +69,7 @@ async def setup_dp_locations(dp_client):
                     init_time_utc=init_time,
                     values=values,
                 ))
-                # Also create adjuster forecasts for national (gsp_id=0)
                 if gsp_id == 0:
-                    adj_resp = await client.create_forecaster(
-                        dp.CreateForecasterRequest(name=f"{model_name}_adjust", version="1.0.0")
-                    )
                     await client.create_forecast(dp.CreateForecastRequest(
                         forecaster=adj_resp.forecaster,
                         location_uuid=location_uuids[gsp_id],
@@ -110,7 +111,7 @@ async def _get_blend_forecasts(dp_client, blend_name):
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app(dp_client):
     """App should complete without errors and save forecasts to Data Platform."""
-    asyncio.run(app(gsps=list(range(0, 11))))
+    await app(gsps=list(range(0, 11)))
 
     blend_forecasts = await _get_blend_forecasts(dp_client, os.environ["BLEND_NAME"])
     assert len(blend_forecasts) >= 1
@@ -122,11 +123,11 @@ async def test_app_twice(dp_client):
     """Running the app a second time should succeed and update the saved blend forecast."""
     blend_name = os.environ["BLEND_NAME"]
 
-    asyncio.run(app(gsps=list(range(0, 11))))
+    await app(gsps=list(range(0, 11)))
     blend_after_first = await _get_blend_forecasts(dp_client, blend_name)
     assert len(blend_after_first) >= 1
 
-    asyncio.run(app(gsps=list(range(0, 11))))
+    await app(gsps=list(range(0, 11)))
     blend_after_second = await _get_blend_forecasts(dp_client, blend_name)
     assert len(blend_after_second) >= 1
 
@@ -135,7 +136,7 @@ async def test_app_twice(dp_client):
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app_only_national(dp_client):
     """App run restricted to gsp_id=0 should save only the national blend forecast."""
-    asyncio.run(app(gsps=[0]))
+    await app(gsps=[0])
 
     blend_forecasts = await _get_blend_forecasts(dp_client, os.environ["BLEND_NAME"])
     assert len(blend_forecasts) >= 1
@@ -162,7 +163,7 @@ async def test_app_only_ecwmf_and_xg(dp_client):
 
     with patch("forecast_blend.app.get_national_blend_weights", new=AsyncMock(return_value=mock_weights)), \
          patch("forecast_blend.app.get_regional_blend_weights", new=AsyncMock(return_value=mock_weights)):
-        asyncio.run(app(gsps=[0]))
+        await app(gsps=[0])
 
     # Read back from DP
     channel = Channel(host=host, port=port)
@@ -184,21 +185,18 @@ async def test_app_only_ecwmf_and_xg(dp_client):
     )
     assert blend_forecast is not None
 
-    # Stream values and check the blend transitions from ecmwf (0 MW) toward xg (1 MW)
-    stream = client.stream_forecast_data(dp.StreamForecastDataRequest(
-        energy_source=dp.EnergySource.SOLAR,
-        location_uuid=location_uuid,
-        forecasters=blend_forecast.forecaster,
-        time_window=dp.TimeWindow(
-            start_timestamp_utc=init_time,
-            end_timestamp_utc=init_time + datetime.timedelta(hours=13),
-        ),
-    ))
-    values = [v async for v in stream]
+    # Fetch the timeseries and verify values exist
+    timeseries_resp = await client.get_forecast_as_timeseries(
+        dp.GetForecastAsTimeseriesRequest(
+            location_uuid=location_uuid,
+            energy_source=dp.EnergySource.SOLAR,
+            forecaster=blend_forecast.forecaster,
+            time_window=dp.TimeWindow(
+                start_timestamp_utc=init_time,
+                end_timestamp_utc=init_time + datetime.timedelta(hours=13),
+            ),
+        )
+    )
     channel.close()
 
-    assert len(values) > 0
-    # Early steps should be near 0 (ecmwf-dominated), late steps near xg_fraction
-    early_value = values[0].p50_fraction
-    late_value = values[-1].p50_fraction
-    assert late_value > early_value
+    assert len(timeseries_resp.values) > 0

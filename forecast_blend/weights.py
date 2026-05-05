@@ -127,7 +127,10 @@ async def _fetch_latest_forecast_metadata_from_dp(
         logger.warning("No forecast metadata found from Data Platform")
         return pd.DataFrame(columns=['created_utc', 'forecast_creation_time', 'location_id', 'name'])
 
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    df["forecast_creation_time"] = pd.to_datetime(df["forecast_creation_time"], utc=True)
+    df["created_utc"] = pd.to_datetime(df["created_utc"], utc=True)
+    return df
 
 
 async def get_latest_forecast_metadata_with_switch(
@@ -170,9 +173,6 @@ async def get_latest_forecast_metadata_with_switch(
         )
 
 
-def _get_most_recent_row(df: pd.DataFrame) -> pd.Series:
-    return df.sort_values("forecast_creation_time", ascending=False).iloc[0]
-
 
 def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[str, pd.Timedelta]:
     """Construct a dictionary of how delayed each model is
@@ -185,10 +185,9 @@ def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[st
     """
     
     # Filter to the most recent forecast ID per model
-    df_forecast_ids = (
-        df_forecast_ids.groupby("name")[df_forecast_ids.columns]
-        .apply(_get_most_recent_row)
-    )
+    df_forecast_ids = df_forecast_ids.loc[
+        df_forecast_ids.groupby("name")["forecast_creation_time"].idxmax()
+    ]
     
     # Approximate the forecast initialisation time
     df_forecast_ids["initialisation_datetime_utc"] = (

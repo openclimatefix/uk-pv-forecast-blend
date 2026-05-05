@@ -266,7 +266,7 @@ async def test_get_blend_forecast_three_models():
 
     df1 = _make_df("test_1", [
         [t0 + timedelta(minutes=m), 1, 0, _now(), {}, "test_1"]
-        for m in [-60, -30, 0, 30, 2 * 60, 7 * 60]
+        for m in [0, 30, 2 * 60, 7 * 60]
     ])
     df2 = _make_df("test_2", [
         [t0 + timedelta(minutes=m), 2, 50, _now(), {}, "test_2"]
@@ -322,10 +322,8 @@ async def test_get_blend_forecast_three_models_with_gap():
         )
     )
 
-    # test_1 only has t=-60 (a gap at everything else)
-    df1 = _make_df("test_1", [
-        [t0 + timedelta(minutes=-60), 1, 0, _now(), {}, "test_1"],
-    ])
+    # test_1 only had t=-60 originally; after start_datetime filtering nothing remains
+    df1 = _make_df("test_1", [])
     df2 = _make_df("test_2", [
         [t0 + timedelta(minutes=m), 2, 50, _now(), {}, "test_2"]
         for m in [0, 30, 2 * 60, 7 * 60, 8 * 60]

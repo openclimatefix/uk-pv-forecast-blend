@@ -108,6 +108,10 @@ async def test_get_blend_forecast_values_latest_two_model_read_one():
     assert len(result) == 2
     assert result.iloc[0]["p50_mw"] == 1
     assert result.iloc[1]["p50_mw"] == 2
+    assert result.iloc[0]["p10_mw"] == 0.9
+    assert result.iloc[0]["p90_mw"] == 1.1
+    assert result.iloc[1]["p10_mw"] == 1.8
+    assert result.iloc[1]["p90_mw"] == 2.2
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -155,8 +159,19 @@ async def test_get_blend_forecast_values_latest_two_model_read_two():
 
     assert len(result) == 7
     assert result.iloc[0]["p50_mw"] == 1
+    assert result.iloc[1]["p50_mw"] == 1
+    assert result.iloc[2]["p50_mw"] == 1
+    assert result.iloc[3]["p50_mw"] == 1
     assert result.iloc[4]["p50_mw"] == 2   # blend at 50/50
     assert result.iloc[5]["p50_mw"] == 3
+    assert result.iloc[6]["p50_mw"] == 3
+    assert result.iloc[0]["adjust_mw"] == 0
+    assert result.iloc[1]["adjust_mw"] == 0
+    assert result.iloc[2]["adjust_mw"] == 0
+    assert result.iloc[3]["adjust_mw"] == 0
+    assert result.iloc[4]["adjust_mw"] == 100
+    assert result.iloc[5]["adjust_mw"] == 200
+    assert result.iloc[6]["adjust_mw"] == 200
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -199,6 +214,13 @@ async def test_get_blend_forecast_values_latest_negative():
         )
 
     assert len(result_df) == 4
+    assert result_df.iloc[0]["p50_mw"] == -1
+    assert result_df.iloc[1]["p50_mw"] == -1
+    assert result_df.iloc[2]["p50_mw"] == -1.5
+    assert result_df.iloc[3]["p50_mw"] == -2
+    assert result_df.iloc[0]["adjust_mw"] == 1.0
+    assert result_df.iloc[2]["adjust_mw"] == 1.5
+    assert result_df.iloc[3]["adjust_mw"] == 2.0
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -242,6 +264,13 @@ async def test_get_blend_forecast_values_latest_no_properties():
         )
 
     assert len(result_df) == 4
+    assert result_df.iloc[0]["p50_mw"] == 1
+    assert result_df.iloc[1]["p50_mw"] == 1
+    assert result_df.iloc[2]["p50_mw"] == 1
+    assert result_df.iloc[3]["p50_mw"] == 1
+    assert all(result_df["properties"].apply(lambda x: x == {}))
+    assert "p10_mw" not in result_df.columns
+    assert "p90_mw" not in result_df.columns
 
 
 @pytest.mark.asyncio(loop_scope="session")

@@ -5,7 +5,6 @@ import pytest_asyncio
 import time_machine
 import pandas as pd
 from betterproto.lib.google.protobuf import Struct, Value
-from grpclib.client import Channel
 from ocf import dp
 from unittest.mock import AsyncMock, patch
 
@@ -13,18 +12,14 @@ from forecast_blend.app import app
 from forecast_blend.weights import ALL_MODEL_NAMES
 
 
-@pytest_asyncio.fixture(autouse=True, scope="module")
-async def setup_dp_locations(dp_client):
+@pytest_asyncio.fixture(autouse=True, scope="session", loop_scope="session")
+async def setup_dp_locations(data_client):
     """Create locations and seed input forecasts in Data Platform for app tests."""
-    host, port = dp_client
-    channel = Channel(host=host, port=port)
-    client = dp.DataPlatformDataServiceStub(channel)
-
     location_uuids = {}
     for gsp_id in range(0, 15):
         try:
             metadata_gsp = Struct(fields={"gsp_id": Value(number_value=gsp_id)})
-            resp = await client.create_location(dp.CreateLocationRequest(
+            resp = await data_client.create_location(dp.CreateLocationRequest(
                 location_name=f"test_gsp_{gsp_id}",
                 energy_source=dp.EnergySource.SOLAR,
                 geometry_wkt="POLYGON((-2 52, -1 52, -1 53, -2 53, -2 52))",
@@ -50,10 +45,10 @@ async def setup_dp_locations(dp_client):
     for model_name in ALL_MODEL_NAMES:
         gsp_ids_for_model = [0] if model_name == "National_xg" else list(range(0, 12))
         try:
-            forecaster_resp = await client.create_forecaster(
+            forecaster_resp = await data_client.create_forecaster(
                 dp.CreateForecasterRequest(name=model_name, version="1.0.0")
             )
-            adj_resp = await client.create_forecaster(
+            adj_resp = await data_client.create_forecaster(
                 dp.CreateForecasterRequest(name=f"{model_name}_adjust", version="1.0.0")
             )
         except Exception:
@@ -62,7 +57,7 @@ async def setup_dp_locations(dp_client):
             if gsp_id not in location_uuids:
                 continue
             try:
-                await client.create_forecast(dp.CreateForecastRequest(
+                await data_client.create_forecast(dp.CreateForecastRequest(
                     forecaster=forecaster_resp.forecaster,
                     location_uuid=location_uuids[gsp_id],
                     energy_source=dp.EnergySource.SOLAR,
@@ -70,7 +65,7 @@ async def setup_dp_locations(dp_client):
                     values=values,
                 ))
                 if gsp_id == 0:
-                    await client.create_forecast(dp.CreateForecastRequest(
+                    await data_client.create_forecast(dp.CreateForecastRequest(
                         forecaster=adj_resp.forecaster,
                         location_uuid=location_uuids[gsp_id],
                         energy_source=dp.EnergySource.SOLAR,
@@ -80,27 +75,20 @@ async def setup_dp_locations(dp_client):
             except Exception:
                 pass
 
-    channel.close()
 
-
-async def _get_blend_forecasts(dp_client, blend_name):
+async def _get_blend_forecasts(data_client, blend_name):
     """Helper: fetch blend forecasts for the national (NATION) location."""
-    host, port = dp_client
-    channel = Channel(host=host, port=port)
-    client = dp.DataPlatformDataServiceStub(channel)
-
-    locations_resp = await client.list_locations(dp.ListLocationsRequest(
+    locations_resp = await data_client.list_locations(dp.ListLocationsRequest(
         energy_source_filter=dp.EnergySource.SOLAR,
         location_type_filter=dp.LocationType.NATION,
     ))
     assert len(locations_resp.locations) >= 1
     location_uuid = locations_resp.locations[0].location_uuid
 
-    forecasts_resp = await client.get_latest_forecasts(dp.GetLatestForecastsRequest(
+    forecasts_resp = await data_client.get_latest_forecasts(dp.GetLatestForecastsRequest(
         location_uuid=location_uuid,
         energy_source=dp.EnergySource.SOLAR,
     ))
-    channel.close()
     return [
         f for f in forecasts_resp.forecasts
         if f.forecaster.forecaster_name == blend_name
@@ -109,45 +97,80 @@ async def _get_blend_forecasts(dp_client, blend_name):
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-async def test_app(dp_client):
-    """App should complete without errors and save forecasts to Data Platform."""
+async def test_app(data_client):
+    """App should complete without errors and save forecasts to Data Platform for all GSPs."""
     await app(gsps=list(range(0, 11)))
 
-    blend_forecasts = await _get_blend_forecasts(dp_client, os.environ["BLEND_NAME"])
+    blend_name = os.environ["BLEND_NAME"]
+    blend_forecasts = await _get_blend_forecasts(data_client, blend_name)
     assert len(blend_forecasts) >= 1
+
+    # Check the national blend has the right number of forecast values (16 seeded)
+    national_resp = await data_client.list_locations(dp.ListLocationsRequest(
+        energy_source_filter=dp.EnergySource.SOLAR,
+        location_type_filter=dp.LocationType.NATION,
+    ))
+    national_uuid = national_resp.locations[0].location_uuid
+    init_time = datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc)
+    timeseries_resp = await data_client.get_forecast_as_timeseries(
+        dp.GetForecastAsTimeseriesRequest(
+            location_uuid=national_uuid,
+            energy_source=dp.EnergySource.SOLAR,
+            forecaster=blend_forecasts[0].forecaster,
+            time_window=dp.TimeWindow(
+                start_timestamp_utc=init_time,
+                end_timestamp_utc=init_time + datetime.timedelta(hours=9),
+            ),
+        )
+    )
+    assert len(timeseries_resp.values) == 16
+
+    # Check blend forecasts exist for all GSPs (gsp_ids 1-10)
+    gsp_resp = await data_client.list_locations(dp.ListLocationsRequest(
+        energy_source_filter=dp.EnergySource.SOLAR,
+        location_type_filter=dp.LocationType.GSP,
+    ))
+    gsp_blend_count = 0
+    for loc in gsp_resp.locations:
+        forecasts_resp = await data_client.get_latest_forecasts(dp.GetLatestForecastsRequest(
+            location_uuid=loc.location_uuid,
+            energy_source=dp.EnergySource.SOLAR,
+        ))
+        if any(f.forecaster.forecaster_name == blend_name for f in forecasts_resp.forecasts):
+            gsp_blend_count += 1
+    assert gsp_blend_count == 10  # gsp_ids 1-10
 
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-async def test_app_twice(dp_client):
+async def test_app_twice(data_client):
     """Running the app a second time should succeed and update the saved blend forecast."""
     blend_name = os.environ["BLEND_NAME"]
 
     await app(gsps=list(range(0, 11)))
-    blend_after_first = await _get_blend_forecasts(dp_client, blend_name)
+    blend_after_first = await _get_blend_forecasts(data_client, blend_name)
     assert len(blend_after_first) >= 1
 
     await app(gsps=list(range(0, 11)))
-    blend_after_second = await _get_blend_forecasts(dp_client, blend_name)
-    assert len(blend_after_second) >= 1
+    blend_after_second = await _get_blend_forecasts(data_client, blend_name)
+    assert len(blend_after_second) == len(blend_after_first)
 
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-async def test_app_only_national(dp_client):
+async def test_app_only_national(data_client):
     """App run restricted to gsp_id=0 should save only the national blend forecast."""
     await app(gsps=[0])
 
-    blend_forecasts = await _get_blend_forecasts(dp_client, os.environ["BLEND_NAME"])
+    blend_forecasts = await _get_blend_forecasts(data_client, os.environ["BLEND_NAME"])
     assert len(blend_forecasts) >= 1
 
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-async def test_app_only_ecwmf_and_xg(dp_client):
+async def test_app_only_ecwmf_and_xg(data_client):
     """When only pvnet_ecmwf (value=0) and National_xg (value=1) have data, the blend
     should transition from ecmwf-only to xg-only across forecast horizon."""
-    host, port = dp_client
     blend_name = os.environ["BLEND_NAME"]
     init_time = datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc)
 
@@ -165,17 +188,13 @@ async def test_app_only_ecwmf_and_xg(dp_client):
          patch("forecast_blend.app.get_regional_blend_weights", new=AsyncMock(return_value=mock_weights)):
         await app(gsps=[0])
 
-    # Read back from DP
-    channel = Channel(host=host, port=port)
-    client = dp.DataPlatformDataServiceStub(channel)
-
-    locations_resp = await client.list_locations(dp.ListLocationsRequest(
+    locations_resp = await data_client.list_locations(dp.ListLocationsRequest(
         energy_source_filter=dp.EnergySource.SOLAR,
         location_type_filter=dp.LocationType.NATION,
     ))
     location_uuid = locations_resp.locations[0].location_uuid
 
-    forecasts_resp = await client.get_latest_forecasts(dp.GetLatestForecastsRequest(
+    forecasts_resp = await data_client.get_latest_forecasts(dp.GetLatestForecastsRequest(
         location_uuid=location_uuid,
         energy_source=dp.EnergySource.SOLAR,
     ))
@@ -186,7 +205,7 @@ async def test_app_only_ecwmf_and_xg(dp_client):
     assert blend_forecast is not None
 
     # Fetch the timeseries and verify values exist
-    timeseries_resp = await client.get_forecast_as_timeseries(
+    timeseries_resp = await data_client.get_forecast_as_timeseries(
         dp.GetForecastAsTimeseriesRequest(
             location_uuid=location_uuid,
             energy_source=dp.EnergySource.SOLAR,
@@ -197,6 +216,4 @@ async def test_app_only_ecwmf_and_xg(dp_client):
             ),
         )
     )
-    channel.close()
-
-    assert len(timeseries_resp.values) > 0
+    assert len(timeseries_resp.values) == 16

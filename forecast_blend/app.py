@@ -71,40 +71,30 @@ async def app(gsps: list[int] | None = None) -> None:
     logger.info(f"Weights for national blend: {national_weights_df}")
     logger.info(f"Weights for regional blend: {regional_weights_df}")
 
-    # Connect to Data Platform for reading forecasts
     host, port = get_data_platform_connection()
-    dp_channel = Channel(host=host, port=port)
-    dp_client = dp.DataPlatformDataServiceStub(dp_channel)
-    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
-
     forecast_values_by_gsp_id = {}
-    for gsp_id in gsps:
-        logger.info(f"Blending forecasts for gsp id {gsp_id}")
-        try:
-            forecast_values_df = await get_blend_forecast_values_latest(
-                gsp_id=gsp_id,
-                start_datetime=start_datetime,
-                weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
-                gsp_uuid_map=gsp_uuid_map,
-                dp_client=dp_client,
-            )
-            forecast_values_by_gsp_id[gsp_id] = forecast_values_df
-        except Exception as e:
-            logger.exception(f"Failed to blend forecasts for gsp_id {gsp_id}")
-            logger.debug(f"Exception: {e}")
-
-    dp_channel.close()
-
-    # Save to Data Platform
-    logger.info("Saving forecast to data platform")
-    channel = Channel(
-        os.getenv("DATA_PLATFORM_HOST", "localhost"),
-        int(os.getenv("DATA_PLATFORM_PORT", "50051")),
-    )
-
-    async with channel:
+   # Connect to Data Platform for reading forecasts and saving blends
+    async with Channel(host=host, port=port) as channel:
         client = dp.DataPlatformDataServiceStub(channel)
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+
+        for gsp_id in gsps:
+            logger.info(f"Blending forecasts for gsp id {gsp_id}")
+            try:
+                forecast_values_df = await get_blend_forecast_values_latest(
+                    gsp_id=gsp_id,
+                    start_datetime=start_datetime,
+                    weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
+                    gsp_uuid_map=gsp_uuid_map,
+                    dp_client=client,
+                )
+                forecast_values_by_gsp_id[gsp_id] = forecast_values_df
+            except Exception as e:
+                logger.exception(f"Failed to blend forecasts for gsp_id {gsp_id}")
+                logger.debug(f"Exception: {e}")
+
+        # Save to Data Platform
+        logger.info("Saving forecast to data platform")
         metadata = await get_metadata(client=client, location_uuid=gsp_uuid_map[0]["location_uuid"])
         _ = await save_forecast_to_data_platform(
             forecast_values_by_gsp_id=forecast_values_by_gsp_id,
@@ -114,7 +104,6 @@ async def app(gsps: list[int] | None = None) -> None:
             client=client,
             metadata=metadata,
         )
-        channel.close()
     logger.info("Finished")
 
 

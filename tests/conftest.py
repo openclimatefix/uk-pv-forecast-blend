@@ -3,6 +3,9 @@ import time
 from importlib.metadata import version
 
 import pytest
+import pytest_asyncio
+from grpclib.client import Channel
+from ocf import dp
 from testcontainers.postgres import PostgresContainer
 from testcontainers.core.container import DockerContainer
 
@@ -46,3 +49,11 @@ def dp_client():
             os.environ["DATA_PLATFORM_PORT"] = str(port)
 
             yield host, port
+
+
+@pytest_asyncio.fixture(scope="session")
+async def data_client(dp_client):
+    host, port = dp_client
+    channel = Channel(host=host, port=port)
+    yield dp.DataPlatformDataServiceStub(channel)
+    channel.close()

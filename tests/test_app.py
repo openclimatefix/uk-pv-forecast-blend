@@ -64,24 +64,20 @@ async def setup_dp_locations(data_client):
         for gsp_id in gsp_ids_for_model:
             if gsp_id not in location_uuids:
                 continue
-            try:
-                await data_client.create_forecast(dp.CreateForecastRequest(
-                    forecaster=forecaster_resp.forecaster,
-                    location_uuid=location_uuids[gsp_id],
-                    energy_source=dp.EnergySource.SOLAR,
-                    init_time_utc=init_time,
-                    values=values,
-                ))
-                if gsp_id == 0:
+            forecasters = [forecaster_resp.forecaster]
+            if gsp_id == 0:
+                forecasters.append(adj_resp.forecaster)
+            for forecaster in forecasters:
+                try:
                     await data_client.create_forecast(dp.CreateForecastRequest(
-                        forecaster=adj_resp.forecaster,
+                        forecaster=forecaster,
                         location_uuid=location_uuids[gsp_id],
                         energy_source=dp.EnergySource.SOLAR,
                         init_time_utc=init_time,
                         values=values,
                     ))
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
 
 async def _get_blend_forecasts(data_client, blend_name):

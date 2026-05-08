@@ -1,3 +1,14 @@
+"""
+Tests:
+1. test_get_blend_forecast_values_latest_one_model          - Only one model has weight=1; result uses that model's values only
+2. test_get_blend_forecast_values_latest_two_model_read_one - Two models weighted but only one returns data
+3. test_get_blend_forecast_values_latest_two_model_read_two - Two models both return data and are blended by weights
+4. test_get_blend_forecast_values_latest_negative           - Blend with negative source values runs without error
+5. test_get_blend_forecast_values_latest_no_properties      - Missing forecast properties returns empty dict
+6. test_get_blend_forecast_three_models                     - Three models blended correctly
+7. test_get_blend_forecast_three_models_with_gap            - Gap in one model's data is filled using future weights
+"""
+
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, patch
 import pandas as pd

@@ -1,3 +1,11 @@
+"""
+Tests:
+1. test_app                    - App completes and saves blend forecasts to DP for all GSPs
+2. test_app_twice              - Running app a second time updates forecasts without duplicating
+3. test_app_only_national      - App restricted to gsp_id=0 saves only the national blend
+4. test_app_only_ecwmf_and_xg  - Blend with only ecmwf/xg models transitions correctly across horizon
+"""
+
 import datetime
 import os
 import pytest

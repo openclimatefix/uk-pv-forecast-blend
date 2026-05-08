@@ -1,3 +1,9 @@
+"""
+Tests:
+1. test_get_start_datetime          - Start datetime is always on a 30-min boundary
+2. test_get_start_datetime_midnight - Start datetime rolls back correctly across midnight
+"""
+
 import time_machine
 from datetime import datetime, timezone
 from forecast_blend.utils import get_start_datetime

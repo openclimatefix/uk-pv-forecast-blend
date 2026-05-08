@@ -1,10 +1,11 @@
 """
 Integration tests for reading forecasts from the Data Platform.
 
-These tests verify that:
-1. Forecast values can be read from the Data Platform
-2. Forecast metadata can be read for calculating model delays
-3. The blend service can blend forecasts read from the Data Platform
+Tests:
+1. test_read_forecast_metadata_from_data_platform - Forecast metadata (used for model delay calc) can be read from DP
+2. test_read_forecast_values_from_data_platform   - Forecast values can be read from DP
+3. test_blend_forecasts_from_data_platform        - End-to-end: read and blend multiple model forecasts from DP
+4. test_read_with_no_forecasts_returns_empty      - Reading for a non-existent model returns empty list
 """
 
 import datetime

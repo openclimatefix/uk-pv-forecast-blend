@@ -1,6 +1,14 @@
+"""
+Tests:
+1. test_get_horizon_maes                 - Horizon MAE function runs and covers all model names
+2. test_get_national_blend_weights       - National weights sum to ≤1 and include expected models
+3. test_get_regional_blend_weights       - Regional weights are returned for ecmwf/day_ahead models
+4. test_get_regional_blend_weights_cloud - Regional weights handle excluded/intraday model combinations (parametrized)
+"""
+
 import pandas as pd
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import time_machine
 from forecast_blend.weights import (
@@ -37,11 +45,12 @@ async def test_get_national_blend_weights():
     forecast_time = pd.Timestamp("2023-01-01 00:00", tz="UTC").to_pydatetime()
     metadata_df = _make_metadata_df(["pvnet_ecmwf", "National_xg"], forecast_time)
 
+    mock_client = MagicMock()
     with patch(
-        "forecast_blend.weights.get_latest_forecast_metadata_with_switch",
+        "forecast_blend.weights.get_latest_forecast_metadata",
         new=AsyncMock(return_value=metadata_df),
     ):
-        weights_df = await get_national_blend_weights(t0=t0)
+        weights_df = await get_national_blend_weights(client=mock_client, t0=t0)
 
     assert set(weights_df.columns).issubset(set(ALL_MODEL_NAMES))
     assert (weights_df.sum(axis=1).round(6) <= 1.0001).all()
@@ -55,11 +64,12 @@ async def test_get_regional_blend_weights():
     forecast_time = pd.Timestamp("2023-01-01 00:00", tz="UTC").to_pydatetime()
     metadata_df = _make_metadata_df(["pvnet_ecmwf", "pvnet_day_ahead"], forecast_time)
 
+    mock_client = MagicMock()
     with patch(
-        "forecast_blend.weights.get_latest_forecast_metadata_with_switch",
+        "forecast_blend.weights.get_latest_forecast_metadata",
         new=AsyncMock(return_value=metadata_df),
     ):
-        weights_df = await get_regional_blend_weights(t0=t0)
+        weights_df = await get_regional_blend_weights(client=mock_client, t0=t0)
 
     # National_xg is excluded from regional
     assert "National_xg" not in weights_df.columns
@@ -81,11 +91,12 @@ async def test_get_regional_blend_weights_cloud(exclude_models, intraday_model):
         available = [m for m in available if m not in exclude_models]
     metadata_df = _make_metadata_df(available, forecast_time)
 
+    mock_client = MagicMock()
     with patch(
-        "forecast_blend.weights.get_latest_forecast_metadata_with_switch",
+        "forecast_blend.weights.get_latest_forecast_metadata",
         new=AsyncMock(return_value=metadata_df),
     ):
-        weights_df = await get_regional_blend_weights(t0=t0, exclude_models=exclude_models)
+        weights_df = await get_regional_blend_weights(client=mock_client, t0=t0, exclude_models=exclude_models)
 
     assert intraday_model in weights_df.columns or "pvnet_day_ahead" in weights_df.columns
     assert "National_xg" not in weights_df.columns

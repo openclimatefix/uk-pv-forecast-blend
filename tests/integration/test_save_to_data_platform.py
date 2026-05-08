@@ -1,3 +1,10 @@
+"""
+Tests:
+1. test_save_to_generation_to_data_platform - Blend forecasts can be saved to DP
+2. test_get_metadata_no_forecasts           - Metadata fetch returns empty when no forecasts exist
+3. test_get_metadata                        - Metadata can be fetched after forecasts are saved
+"""
+
 import datetime
 import time
 

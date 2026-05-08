@@ -62,20 +62,19 @@ async def app(gsps: list[int] | None = None) -> None:
     start_datetime = get_start_datetime()
     t0 = pd.Timestamp.utcnow().floor("30min")
 
-    national_weights_df = await get_national_blend_weights(t0, exclude_models)
-    regional_weights_df = await get_regional_blend_weights(t0, exclude_models)
-
-    national_weights_df = backfill_weights(national_weights_df, start_datetime)
-    regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
-
-    logger.info(f"Weights for national blend: {national_weights_df}")
-    logger.info(f"Weights for regional blend: {regional_weights_df}")
-
     host, port = get_data_platform_connection()
     forecast_values_by_gsp_id = {}
-   # Connect to Data Platform for reading forecasts and saving blends
     async with Channel(host=host, port=port) as channel:
         client = dp.DataPlatformDataServiceStub(channel)
+
+        national_weights_df = await get_national_blend_weights(client, t0, exclude_models)
+        regional_weights_df = await get_regional_blend_weights(client, t0, exclude_models)
+
+        national_weights_df = backfill_weights(national_weights_df, start_datetime)
+        regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
+
+        logger.info(f"Weights for national blend: {national_weights_df}")
+        logger.info(f"Weights for regional blend: {regional_weights_df}")
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
 
         for gsp_id in gsps:

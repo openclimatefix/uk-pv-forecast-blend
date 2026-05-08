@@ -8,10 +8,7 @@ from typing import Awaitable, Callable
 from datetime import timezone
 from loguru import logger
 
-from grpclib.client import Channel
 from ocf import dp
-
-from forecast_blend.forecast.data_platform import get_data_platform_connection
 
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]
@@ -133,7 +130,8 @@ async def _fetch_latest_forecast_metadata_from_dp(
     return df
 
 
-async def get_latest_forecast_metadata_with_switch(
+async def get_latest_forecast_metadata(
+    client: dp.DataPlatformDataServiceStub,
     model_names: list[str],
     t0: pd.Timestamp,
     max_delay: pd.Timedelta,
@@ -142,6 +140,7 @@ async def get_latest_forecast_metadata_with_switch(
     """Get latest forecast metadata from Data Platform.
 
     Args:
+        client: Data Platform stub to use for requests
         model_names: List of model names to filter to
         t0: The blend forecast init-time
         max_delay: Max delay with respect to t0 to consider using forecast in the blend
@@ -159,18 +158,14 @@ async def get_latest_forecast_metadata_with_switch(
             f"Unknown location_type: {location_type!r}. Expected 'national' or 'regional'."
         )
 
-    host, port = get_data_platform_connection()
-
-    async with Channel(host=host, port=port) as channel:
-        client = dp.DataPlatformDataServiceStub(channel)
-        logger.info("Reading forecast metadata from Data Platform")
-        return await _fetch_latest_forecast_metadata_from_dp(
-            client=client,
-            model_names=model_names,
-            t0=t0,
-            max_delay=max_delay,
-            list_locations_fn=list_locations_fn,
-        )
+    logger.info("Reading forecast metadata from Data Platform")
+    return await _fetch_latest_forecast_metadata_from_dp(
+        client=client,
+        model_names=model_names,
+        t0=t0,
+        max_delay=max_delay,
+        list_locations_fn=list_locations_fn,
+    )
 
 
 
@@ -403,6 +398,7 @@ def calculate_optimal_blend_weights(
 
 
 async def get_national_blend_weights(
+    client: dp.DataPlatformDataServiceStub,
     t0: pd.Timestamp, 
     exclude_models: list[str] | None = None,
 ) -> pd.DataFrame:
@@ -446,7 +442,8 @@ async def get_national_blend_weights(
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
-    df_latest_forecast_ids = await get_latest_forecast_metadata_with_switch(
+    df_latest_forecast_ids = await get_latest_forecast_metadata(
+        client=client,
         model_names=all_model_names, 
         t0=t0, 
         max_delay=max_horizon,
@@ -503,6 +500,7 @@ async def get_national_blend_weights(
 
 
 async def get_regional_blend_weights(
+    client: dp.DataPlatformDataServiceStub,
     t0: pd.Timestamp, 
     exclude_models: list[str] = None,
 ) -> pd.DataFrame:
@@ -546,7 +544,8 @@ async def get_regional_blend_weights(
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
-    df_latest_forecast_ids = await get_latest_forecast_metadata_with_switch(
+    df_latest_forecast_ids = await get_latest_forecast_metadata(
+        client=client,
         model_names=all_regional_models, 
         t0=t0, 
         max_delay=max_horizon,

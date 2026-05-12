@@ -3,15 +3,12 @@
 This app is for blending forecast together
 
 The main application (forecast_blend/app.py)
-1. Loads different forecasts 
+1. Loads different forecasts from Data Platform
 2. Blends them together using weights
 3. Saves them ready to be used by the api
 4. This is done for all GSPs
 
 This was previously done in the API
-
-We always update the ForecastValueLatest table, 
-but we only update the ForecastValue table every 30 minutes
 
 # Details
 
@@ -52,13 +49,11 @@ into National_XG if needed - but this should rarely be the case
 
 ## Environment Variables
 
-- `DB_URL`: The database url you want to save the results to
 - `N_GSP`: The number of gsps you want to pull. N_GSP=1 means only National is run. 
 - `BLEND_NAME`: The model name to save the blend under. Defaults to `"blend"`.
 - `ALLOW_CLOUDCASTING`: Whether to allow `"pvnet_cloud"` to be part of the blend. Defaults to False
 - `DATA_PLATFORM_HOST`: The data platform host name. Default is `localhost`
 - `DATA_PLATFORM_PORT`: The data platform port. Default is `50051`.
-- `READ_FROM_DATA_PLATFORM`: Whether to read forecasts from Data Platform instead of the database. Defaults to false.
 
 # Tests
 

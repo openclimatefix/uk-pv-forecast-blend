@@ -114,9 +114,8 @@ async def setup_test_data(dp_client):
     for model_name in [
         "pvnet_day_ahead",
         "pvnet_day_ahead_adjust",
-        "national_xg",
-        "national_xg_adjust",
         "pvnet_v2",
+        "pvnet_v2_adjust",
     ]:
         response = await client.create_forecaster(
             dp.CreateForecasterRequest(name=model_name, version="1.0.0")
@@ -306,8 +305,8 @@ async def test_blend_forecasts_from_data_platform(
         capacity_watts=test_data["locations"][0]["capacity_watts"],
     )
 
-    # national_xg forecast - values from 200-280
-    xg_values = [
+    # pvnet_v2 forecast - values from 200-280
+    pvnet_v2_values = [
         {
             "target_time": init_time + datetime.timedelta(minutes=30 * i),
             "p50_mw": 200 + i * 10,
@@ -317,10 +316,10 @@ async def test_blend_forecasts_from_data_platform(
 
     await create_test_forecast(
         client=client,
-        forecaster=test_data["forecasters"]["national_xg"],
+        forecaster=test_data["forecasters"]["pvnet_v2"],
         location_uuid=test_data["locations"][0]["uuid"],
         init_time=init_time,
-        forecast_values=xg_values,
+        forecast_values=pvnet_v2_values,
         capacity_watts=test_data["locations"][0]["capacity_watts"],
     )
 
@@ -341,7 +340,7 @@ async def test_blend_forecasts_from_data_platform(
         capacity_watts=test_data["locations"][0]["capacity_watts"],
     )
 
-    xg_adjust_values = [
+    pvnet_v2_adjust_values = [
         {
             "target_time": init_time + datetime.timedelta(minutes=30 * i),
             "p50_mw": 150 + i * 10,
@@ -350,10 +349,10 @@ async def test_blend_forecasts_from_data_platform(
     ]
     await create_test_forecast(
         client=client,
-        forecaster=test_data["forecasters"]["national_xg_adjust"],
+        forecaster=test_data["forecasters"]["pvnet_v2_adjust"],
         location_uuid=test_data["locations"][0]["uuid"],
         init_time=init_time,
-        forecast_values=xg_adjust_values,
+        forecast_values=pvnet_v2_adjust_values,
         capacity_watts=test_data["locations"][0]["capacity_watts"],
     )
 
@@ -368,10 +367,10 @@ async def test_blend_forecasts_from_data_platform(
         gsp_id=gsp_id,
     )
 
-    xg_forecast = await get_forecast_values_from_data_platform(
+    pvnet_v2_forecast = await get_forecast_values_from_data_platform(
         client=client,
         location_uuid=test_data["locations"][0]["uuid"],
-        model_name="national_xg",
+        model_name="pvnet_v2",
         start_datetime=init_time.replace(tzinfo=None),
         gsp_id=gsp_id,
     )
@@ -380,21 +379,21 @@ async def test_blend_forecasts_from_data_platform(
     assert len(pvnet_forecast) == 8, (
         f"Expected 8 pvnet values, got {len(pvnet_forecast)}"
     )
-    assert len(xg_forecast) == 8, f"Expected 8 xg values, got {len(xg_forecast)}"
+    assert len(pvnet_v2_forecast) == 8, f"Expected 8 pvnet_v2 values, got {len(pvnet_v2_forecast)}"
 
     # Verify the values are different (confirming we got data from different models)
     pvnet_first_value = pvnet_forecast["expected_power_generation_megawatts"].iloc[0]
-    xg_first_value = xg_forecast["expected_power_generation_megawatts"].iloc[0]
+    pvnet_v2_first_value = pvnet_v2_forecast["expected_power_generation_megawatts"].iloc[0]
 
     # The values should be different since we created different forecasts
-    assert pvnet_first_value != xg_first_value, "Forecasts should have different values"
+    assert pvnet_first_value != pvnet_v2_first_value, "Forecasts should have different values"
 
     # For gsp_id=0, adjust_mw should be derived from main - adjuster forecasts.
     assert (pvnet_forecast["adjust_mw"] != 0.0).all(), (
         "Expected non-zero adjust_mw values for national pvnet forecast"
     )
-    assert (xg_forecast["adjust_mw"] != 0.0).all(), (
-        "Expected non-zero adjust_mw values for national xg forecast"
+    assert (pvnet_v2_forecast["adjust_mw"] != 0.0).all(), (
+        "Expected non-zero adjust_mw values for national pvnet_v2 forecast"
     )
 
 

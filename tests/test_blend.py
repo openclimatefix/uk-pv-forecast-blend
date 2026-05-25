@@ -242,7 +242,7 @@ async def test_get_blend_forecast_values_latest_no_properties():
     weights_df = pd.DataFrame(
         {
             "cnn": [1,1,.5,0,],
-            "National_xg": [0,0,.5,1,],
+            "day_ahead": [0,0,.5,1,],
         }, 
         index=pd.to_datetime(
             [
@@ -259,8 +259,8 @@ async def test_get_blend_forecast_values_latest_no_properties():
     df1 = _make_df("cnn", [
         [t0 + timedelta(minutes=m), 1, 0, _now(), {}, "cnn"] for m in horizons
     ])
-    df2 = _make_df("National_xg", [
-        [t0 + timedelta(minutes=m), 1, 0, _now(), {}, "National_xg"] for m in horizons
+    df2 = _make_df("day_ahead", [
+        [t0 + timedelta(minutes=m), 1, 0, _now(), {}, "day_ahead"] for m in horizons
     ])
 
     with patch("forecast_blend.blend.fetch_dp_latest_forecasts", new=AsyncMock(return_value=[])), \

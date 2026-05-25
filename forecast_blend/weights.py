@@ -11,7 +11,7 @@ from loguru import logger
 from ocf import dp
 
 
-DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead", "National_xg"]
+DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead"]
 INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_ecmwf", "pvnet_cloud"]
 ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
 
@@ -407,8 +407,8 @@ async def get_national_blend_weights(
     This function calculates weights for combining various day-ahead and intraday models based
     on their historical performance (MAE) and current operational delay. 
     
-    We create a hierarchical blend where up to one day-ahead model is chosen and blended into 
-    National_xg. We also choose up to one intraday model to blend into the day-ahead blend.
+    We create a hierarchical blend where up to one model is chosen and blended into
+    pvnet_day_ahead. We also choose up to one intraday model to blend into the day-ahead blend.
     
     Args:
         t0: The forecast initialisation time
@@ -462,7 +462,7 @@ async def get_national_blend_weights(
     # Calculate the optimal blend weights between day-ahead models
     df_da_model_weights = calculate_optimal_blend_weights(
         df_delayed_mae[all_model_names], 
-        backup_model_name="National_xg", 
+        backup_model_name="pvnet_day_ahead",
         kernel=BLEND_KERNEL, 
         score_func=make_avg_mae_func(36),
     )
@@ -528,13 +528,12 @@ async def get_regional_blend_weights(
           MAE data will not appear as columns or will have zero/NaN weights.
     """
 
-    # National_xg is not a regional model
     if exclude_models is None:
-        exclude_models = ["National_xg"]
-    else:
-        exclude_models = exclude_models + ["National_xg"]
+        exclude_models = []
 
-    df_mae = get_horizon_maes().drop(columns=exclude_models)
+    df_mae = get_horizon_maes()
+    if exclude_models:
+        df_mae = df_mae.drop(columns=exclude_models)
 
     # We need to have MAE-horizon values for all potential models
     all_regional_models = [m for m in ALL_MODEL_NAMES if m not in exclude_models]

@@ -1,9 +1,9 @@
 """
 Tests:
-1. test_app                    - App completes and saves blend forecasts to DP for all GSPs
-2. test_app_twice              - Running app a second time updates forecasts without duplicating
-3. test_app_only_national      - App restricted to gsp_id=0 saves only the national blend
-4. test_app_only_ecwmf_and_xg  - Blend with only ecmwf/xg models transitions correctly across horizon
+1. test_app                          - App completes and saves blend forecasts to DP for all GSPs
+2. test_app_twice                    - Running app a second time updates forecasts without duplicating
+3. test_app_only_national            - App restricted to gsp_id=0 saves only the national blend
+4. test_app_only_ecmwf_and_day_ahead - Blend with only ecmwf/day_ahead models transitions correctly across horizon
 """
 
 import datetime
@@ -51,7 +51,7 @@ async def setup_dp_locations(data_client):
         for i in range(1, 17)
     ]
     for model_name in ALL_MODEL_NAMES:
-        gsp_ids_for_model = [0] if model_name == "National_xg" else list(range(0, 12))
+        gsp_ids_for_model = list(range(0, 12))
         try:
             forecaster_resp = await data_client.create_forecaster(
                 dp.CreateForecasterRequest(name=model_name, version="1.0.0")
@@ -172,21 +172,21 @@ async def test_app_only_national(data_client):
 
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
-async def test_app_only_ecwmf_and_xg(data_client):
-    """When only pvnet_ecmwf (value=0) and National_xg (value=1) have data, the blend
-    should transition from ecmwf-only to xg-only across forecast horizon."""
+async def test_app_only_ecmwf_and_day_ahead(data_client):
+    """When only pvnet_ecmwf (value=0) and pvnet_day_ahead (value=1) have data, the blend
+    should transition from ecmwf-only to day_ahead-only across forecast horizon."""
     blend_name = os.environ["BLEND_NAME"]
     init_time = datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc)
 
-    # Build weights that use only pvnet_ecmwf and National_xg
+    # Build weights that use only pvnet_ecmwf and pvnet_day_ahead
     t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
     horizons = pd.timedelta_range("30min", periods=25, freq="30min")
     ecmwf_weights = pd.Series(
         [1.0] * 16 + [0.75, 0.5, 0.25] + [0.0] * 6, index=t0 + horizons
     )
-    xg_weights = 1.0 - ecmwf_weights
+    day_ahead_weights = 1.0 - ecmwf_weights
 
-    mock_weights = pd.DataFrame({"pvnet_ecmwf": ecmwf_weights, "National_xg": xg_weights})
+    mock_weights = pd.DataFrame({"pvnet_ecmwf": ecmwf_weights, "pvnet_day_ahead": day_ahead_weights})
 
     with patch("forecast_blend.app.get_national_blend_weights", new=AsyncMock(return_value=mock_weights)), \
          patch("forecast_blend.app.get_regional_blend_weights", new=AsyncMock(return_value=mock_weights)):

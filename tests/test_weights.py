@@ -41,9 +41,9 @@ def _make_metadata_df(model_names, forecast_creation_time):
 @pytest.mark.asyncio(loop_scope="session")
 async def test_get_national_blend_weights():
     t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
-    # pvnet_ecmwf is current (no delay); National_xg is current
+    # pvnet_ecmwf and pvnet_day_ahead are current (no delay)
     forecast_time = pd.Timestamp("2023-01-01 00:00", tz="UTC").to_pydatetime()
-    metadata_df = _make_metadata_df(["pvnet_ecmwf", "National_xg"], forecast_time)
+    metadata_df = _make_metadata_df(["pvnet_ecmwf", "pvnet_day_ahead"], forecast_time)
 
     mock_client = MagicMock()
     with patch(
@@ -71,8 +71,6 @@ async def test_get_regional_blend_weights():
     ):
         weights_df = await get_regional_blend_weights(client=mock_client, t0=t0)
 
-    # National_xg is excluded from regional
-    assert "National_xg" not in weights_df.columns
     assert len(weights_df) > 0
     assert (weights_df.sum(axis=1).round(6) <= 1.0001).all()
 
@@ -99,5 +97,4 @@ async def test_get_regional_blend_weights_cloud(exclude_models, intraday_model):
         weights_df = await get_regional_blend_weights(client=mock_client, t0=t0, exclude_models=exclude_models)
 
     assert intraday_model in weights_df.columns or "pvnet_day_ahead" in weights_df.columns
-    assert "National_xg" not in weights_df.columns
     assert len(weights_df) > 0

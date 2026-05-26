@@ -26,8 +26,3 @@ backtest done using the backtest script in PVNet. The backtest was done for the 
 (2022) which all the models were trained with. This is true for all the intraday models, and for the
 pvnet-day-ahead model. All models were assessed on the exact same init-timesand are fully 
 compatible. 
-
-The National_xg model NMAEs are all set to 0.05. These were not measured and instead were set 
-as a value higher than all NMAEs for the other values. From observation we know that the National_xg
-model underperforms PVNet so we only want to use it in the blend if we have run out of PVNet 
-predictions.

@@ -62,3 +62,9 @@ def test_add_legacy_gsp_results_all():
 
     # check that the extra 6 gsps have been added
     assert len(result) == 15
+    assert result[350]["p50_mw"].iloc[0] == 350
+    assert result[4]["p50_mw"].iloc[0] == 350
+
+    assert result[351]["p50_mw"].iloc[0] == 351
+    assert result[56]["p50_mw"].iloc[0] == 351*.27
+

@@ -86,6 +86,8 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
             if source_df is None:
                 logger.warning(f"Source GSP ID {source_id} not found in forecast values; skipping")
                 continue
+            else:
+                source_df = source_df.copy()  # avoid modifying the original DataFrame
             for col in select_cols:
                 if col in source_df.columns:
                     source_df[col] *= weight

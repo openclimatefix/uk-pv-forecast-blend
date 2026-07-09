@@ -30,8 +30,8 @@ import pandas as pd
 
 __version__ = "1.1.9"
 
-# GB has 342 GSPs
-N_GSP = 342
+# GB has 351 GSPs (some of these are legacy)
+N_GSP = 351 
 
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),

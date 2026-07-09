@@ -77,7 +77,8 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
         for gsp_merge_source in gsp_merge_config.pvlive_merge_weights:
             source_id = gsp_merge_source.gsp_id
             weight = gsp_merge_source.weight
-            logger.info(f"Adding legacy GSP results for target GSP ID {source_id}")
+            logger.info(f"Adding legacy GSP results from gsp {source_id} "
+                        f"for target GSP ID {target_gsp_id}")
             source_df = forecast_values_by_gsp_id.get(source_id)
             if source_df is None:
                 logger.warning(f"Source GSP ID {source_id} not found in forecast values; skipping")
@@ -100,7 +101,9 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
             .groupby("target_datetime_utc", as_index=False)
             .sum()
         )
-        base["target_datetime_utc"] = source_dfs[0]["target_datetime_utc"].values
+        # change the index to a column with name target_datetime_utc
+        base["target_datetime_utc"] = base.index
+        base.reset_index(drop=True, inplace=True)
 
         logger.debug(
             f"GSP ID {target_gsp_id} reconstruction complete: "

@@ -93,8 +93,8 @@ async def app(gsps: list[int] | None = None) -> None:
                 logger.exception(f"Failed to blend forecasts for gsp_id {gsp_id}")
                 logger.debug(f"Exception: {e}")
 
-            # add legacy gsps results
-            forecast_values_by_gsp_id = add_legacy_gsp_results(forecast_values_by_gsp_id)
+        # add legacy gsps results
+        forecast_values_by_gsp_id = add_legacy_gsp_results(forecast_values_by_gsp_id)
 
         # Save to Data Platform
         logger.info("Saving forecast to data platform")

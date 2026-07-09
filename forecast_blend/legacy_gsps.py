@@ -67,7 +67,6 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
     select_cols = ["p10_mw", "p50_mw", "p90_mw","adjust_mw"]
 
     for target_gsp_id, gsp_merge_config in legacy_gsps.items():
-        print(target_gsp_id)
 
         if target_gsp_id in forecast_values_by_gsp_id:
             logger.warning(f"Target GSP ID {target_gsp_id} already exists in forecast values; skipping")

@@ -35,7 +35,7 @@ def load_gsp_merge_weights(config_path: str = None) -> dict[int, GSPMergeConfig]
     Missing or empty config files are handled gracefully — an empty dict is returned.
     """
     if config_path is None:
-        config_path = os.path.join(os.path.dirname(__file__), "data/gsp_merge_weights.yaml")
+        config_path = os.path.join(os.path.dirname(__file__), "data/gsp_legacy_weights.yaml")
 
     if not os.path.exists(config_path):
         logger.warning(f"No GSP merge weights config found at {config_path}")
@@ -64,9 +64,10 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
     """
 
     legacy_gsps = load_gsp_merge_weights()
-
+    select_cols = ["p10_mw", "p50_mw", "p90_mw","adjust_mw"]
 
     for target_gsp_id, gsp_merge_config in legacy_gsps.items():
+        print(target_gsp_id)
 
         if target_gsp_id in forecast_values_by_gsp_id:
             logger.warning(f"Target GSP ID {target_gsp_id} already exists in forecast values; skipping")
@@ -82,7 +83,10 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
             if source_df is None:
                 logger.warning(f"Source GSP ID {source_id} not found in forecast values; skipping")
                 continue
-            source_dfs.append(source_df * weight)
+            for col in select_cols:
+                if col in source_df.columns:
+                    source_df[col] *= weight
+            source_dfs.append(source_df)
 
         if len(source_dfs) == 0:
             logger.warning(f"No source GSPs found for target GSP ID {target_gsp_id}; skipping")
@@ -91,9 +95,9 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
         # Concatenate all weighted sources and sum every numeric column in one pass.
         # generation_mw reflects the applied weights; capacity columns are summed across sources.
         # datetime_gmt is the groupby key (not summed); the rest are numeric aggregates.
-        select_cols = ["p10_mw", "p50_mw", "p90_mw","adjust_mw"]
+        all_cols = ["p10_mw", "p50_mw", "p90_mw", "adjust_mw"] + ["target_datetime_utc"]
         base = (
-            pd.concat([df[select_cols] for df in source_dfs], ignore_index=True)
+            pd.concat([df[all_cols] for df in source_dfs], ignore_index=True)
             .groupby("target_datetime_utc", as_index=False)
             .sum()
         )

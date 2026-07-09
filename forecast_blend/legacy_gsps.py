@@ -66,6 +66,9 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
     legacy_gsps = load_gsp_merge_weights()
     select_cols = ["p10_mw", "p50_mw", "p90_mw","adjust_mw"]
 
+    # lets not let this be changed in place
+    forecast_values_by_gsp_id = forecast_values_by_gsp_id.copy()
+
     for target_gsp_id, gsp_merge_config in legacy_gsps.items():
 
         if target_gsp_id in forecast_values_by_gsp_id:

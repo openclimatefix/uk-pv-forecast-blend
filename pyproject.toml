@@ -27,6 +27,8 @@ dependencies = [
     "betterproto==2.0.0b7",
     "grpclib==0.4.8",
     "pytest-asyncio>=1.2.0",
+    "pyyaml>=6.0.3",
+    "pydantic>=2.13.4",
 ]
 dynamic = ["version"]
 

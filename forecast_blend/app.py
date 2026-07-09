@@ -17,6 +17,7 @@ from grpclib.client import Channel
 
 
 from forecast_blend.blend import get_blend_forecast_values_latest
+from forecast_blend.legacy_gsps import add_legacy_gsp_results
 from forecast_blend.utils import get_start_datetime
 from forecast_blend.weights import (
     backfill_weights, 
@@ -91,6 +92,9 @@ async def app(gsps: list[int] | None = None) -> None:
             except Exception as e:
                 logger.exception(f"Failed to blend forecasts for gsp_id {gsp_id}")
                 logger.debug(f"Exception: {e}")
+
+        # add legacy gsps results
+        forecast_values_by_gsp_id = add_legacy_gsp_results(forecast_values_by_gsp_id)
 
         # Save to Data Platform
         logger.info("Saving forecast to data platform")

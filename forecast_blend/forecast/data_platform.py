@@ -166,10 +166,9 @@ async def get_forecast_values_from_data_platform(
         other_stats = getattr(dp_value, "other_statistics_fractions", {}) or {}
         capacity_mw = dp_value.effective_capacity_watts / 1_000_000
         target_time = dp_value.target_timestamp_utc.replace(microsecond=0)
-        if "p10" in other_stats:
-            properties["10"] = other_stats["p10"] * capacity_mw
-        if "p90" in other_stats:
-            properties["90"] = other_stats["p90"] * capacity_mw
+        for p in [2, 10, 25, 75, 90, 98]:
+            if f"p{p:02d}" in other_stats:
+                properties[str(p)] = other_stats[f"p{p:02d}"] * capacity_mw
 
         main_p50_mw = dp_value.p50_value_fraction * capacity_mw
 

@@ -147,15 +147,18 @@ def add_p_levels_to_forecast_values(
     logger.debug("Adding properties to blended forecast values")
     all_model_df.reset_index(inplace=True, drop=True)
 
+    # the plevels (other than p50) that may be present for National forecasts
+    p_levels = ["2", "10", "25", "75", "90", "98"]
+
     # get properties out of json if they exist
     if "properties" in all_model_df.columns:
         properties_only_df = pd.json_normalize(all_model_df["properties"])
         properties_only_df.rename(
-            columns={"10": "plevel_10", "90": "plevel_90"}, inplace=True
+            columns={p: f"plevel_{p}" for p in p_levels}, inplace=True
         )
     else:
         # If properties are missing, create empty columns
-        properties_only_df = pd.DataFrame(columns=["plevel_10", "plevel_90"])
+        properties_only_df = pd.DataFrame(columns=[f"plevel_{p}" for p in p_levels])
 
     properties_only_df = pd.concat(
         [all_model_df[["target_time", "model_name", "adjust_mw"]], properties_only_df],
@@ -171,7 +174,8 @@ def add_p_levels_to_forecast_values(
 
     # blend together the p values if they exist
     blended_on_p_values = None
-    for p_level in ["plevel_10", "plevel_90"]:
+    for p in p_levels:
+        p_level = f"plevel_{p}"
         if p_level in properties_only_df.columns:
             blended_on_p_value = blend_forecasts_together(
                 properties_only_df, weights_df, column_name_to_blend=p_level
@@ -190,14 +194,21 @@ def add_p_levels_to_forecast_values(
         # add properties to blended forecast values if they exist
         blended_df = blended_df.merge(blended_on_p_values, on=["target_time"], how="left")
 
+        # the plevels that were actually present and blended
+        present_p_levels = [p for p in p_levels if f"plevel_{p}" in blended_df.columns]
+
         # format plevels back to dict
-        blended_df.rename(columns={"plevel_10": "10", "plevel_90": "90"}, inplace=True)
-        blended_df["properties"] = blended_df[["10", "90"]].apply(
-            lambda x: json.loads(x.to_json()) if pd.notnull(x).all() else {}, axis=1
+        blended_df.rename(
+            columns={f"plevel_{p}": p for p in present_p_levels}, inplace=True
+        )
+        blended_df["properties"] = blended_df[present_p_levels].apply(
+            lambda x: json.loads(x.dropna().to_json()), axis=1
         )
 
-        # rename
-        blended_df.rename(columns={"10": "p10_mw", "90": "p90_mw"}, inplace=True)
+        # rename to p<level>_mw columns
+        blended_df.rename(
+            columns={p: f"p{p}_mw" for p in present_p_levels}, inplace=True
+        )
 
     else:
         # If blended_on_p_values is None, assign an empty dictionary to properties

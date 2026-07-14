@@ -152,10 +152,10 @@ async def create_test_forecast(
         p50_fraction = v["p50_mw"] * 1e6 / capacity_watts
 
         other_stats = {}
-        if "p10_mw" in v:
-            other_stats["p10"] = v["p10_mw"] * 1e6 / capacity_watts
-        if "p90_mw" in v:
-            other_stats["p90"] = v["p90_mw"] * 1e6 / capacity_watts
+        for p in [2, 10, 25, 75, 90, 98]:
+            p_col = f"p{p}_mw"
+            if p_col in v:
+                other_stats[f"p{p:02d}"] = v[p_col] * 1e6 / capacity_watts
 
         dp_values.append(
             dp.CreateForecastRequestForecastValue(
@@ -233,14 +233,18 @@ async def test_read_forecast_values_from_data_platform(
     client, _, _ = dp_client
     test_data = setup_test_data
 
-    # Create a forecast
+    # Create a National forecast carrying all 7 plevels (p50 plus the 6 others)
     init_time = datetime.datetime(2025, 1, 2, 12, 0, tzinfo=datetime.UTC)
     expected_values = [
         {
             "target_time": init_time + datetime.timedelta(minutes=30 * i),
             "p50_mw": 100 + i * 10,
+            "p2_mw": 80 + i * 10,
             "p10_mw": 90 + i * 10,
+            "p25_mw": 95 + i * 10,
+            "p75_mw": 105 + i * 10,
             "p90_mw": 110 + i * 10,
+            "p98_mw": 120 + i * 10,
         }
         for i in range(1, 9)
     ]
@@ -272,6 +276,23 @@ async def test_read_forecast_values_from_data_platform(
     )
 
     assert len(values) == 8, f"Expected 8 forecast values, got {len(values)}"
+
+    # Reading via get_forecast_values_from_data_platform should recover all 6 non-p50
+    # plevels in the properties dict, converted back to MW
+    df = await get_forecast_values_from_data_platform(
+        client=client,
+        location_uuid=location_uuid,
+        model_name="pvnet_day_ahead",
+        start_datetime=start_datetime,
+        gsp_id=1,
+    )
+
+    assert len(df) == 8
+    properties = df.sort_values("target_time")["properties"].iloc[0]
+    assert set(properties.keys()) == {"2", "10", "25", "75", "90", "98"}
+    assert properties["2"] == pytest.approx(90.0)
+    assert properties["10"] == pytest.approx(100.0)
+    assert properties["98"] == pytest.approx(130.0)
 
 
 @pytest.mark.asyncio(loop_scope="module")

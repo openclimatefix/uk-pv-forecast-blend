@@ -96,13 +96,16 @@ async def test_get_blend_forecast_values_latest_two_model_read_one():
         )
     )
 
+    props_0 = {"2": 0.5, "10": 0.9, "25": 0.95, "75": 1.05, "90": 1.1, "98": 1.5}
+    props_1 = {"2": 1.0, "10": 1.8, "25": 1.9, "75": 2.1, "90": 2.2, "98": 3.0}
+
     df1 = _make_df("test_1", [
-        [datetime(2023, 1, 1, tzinfo=timezone.utc), 1, 0, _now(), {"10": 0.9, "90": 1.1}, "test_1"],
-        [datetime(2023, 1, 1, 0, 30, tzinfo=timezone.utc), 2, 0, _now(), {"10": 1.8, "90": 2.2}, "test_1"],
+        [datetime(2023, 1, 1, tzinfo=timezone.utc), 1, 0, _now(), props_0, "test_1"],
+        [datetime(2023, 1, 1, 0, 30, tzinfo=timezone.utc), 2, 0, _now(), props_1, "test_1"],
     ])
     df2 = _make_df("test_2", [
-        [datetime(2023, 1, 1, tzinfo=timezone.utc), 1, 0, _now(), {"10": 0.9, "90": 1.1}, "test_2"],
-        [datetime(2023, 1, 1, 0, 30, tzinfo=timezone.utc), 2, 0, _now(), {"10": 1.8, "90": 2.2}, "test_2"],
+        [datetime(2023, 1, 1, tzinfo=timezone.utc), 1, 0, _now(), props_0, "test_2"],
+        [datetime(2023, 1, 1, 0, 30, tzinfo=timezone.utc), 2, 0, _now(), props_1, "test_2"],
     ])
 
     with patch("forecast_blend.blend.fetch_dp_latest_forecasts", new=AsyncMock(return_value=[])), \
@@ -119,10 +122,20 @@ async def test_get_blend_forecast_values_latest_two_model_read_one():
     assert len(result) == 2
     assert result.iloc[0]["p50_mw"] == 1
     assert result.iloc[1]["p50_mw"] == 2
+
+    for col in ["p2_mw", "p10_mw", "p25_mw", "p75_mw", "p90_mw", "p98_mw"]:
+        assert col in result.columns
+    assert result.iloc[0]["p2_mw"] == 0.5
     assert result.iloc[0]["p10_mw"] == 0.9
     assert result.iloc[0]["p90_mw"] == 1.1
+    assert result.iloc[0]["p98_mw"] == 1.5
+    assert result.iloc[1]["p2_mw"] == 1.0
     assert result.iloc[1]["p10_mw"] == 1.8
     assert result.iloc[1]["p90_mw"] == 2.2
+    assert result.iloc[1]["p98_mw"] == 3.0
+
+    # the properties dict keeps all 6 non-p50 plevels
+    assert result.iloc[0]["properties"] == props_0
 
 
 @pytest.mark.asyncio(loop_scope="session")

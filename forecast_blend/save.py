@@ -134,9 +134,12 @@ def map_values_df_to_dp_requests(
     horizons_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
     horizons_mins = horizons_mins.astype(int)
 
+    # the plevels (other than p50) that may be saved; National has all 7
+    other_p_levels = [2, 10, 25, 75, 90, 98]
+
     # get adjuster values
     if use_adjuster:
-        for p_col in ["p10_mw", "p50_mw", "p90_mw"]:
+        for p_col in ["p50_mw"] + [f"p{p}_mw" for p in other_p_levels]:
             if p_col in forecast_values_df.columns:
                 forecast_values_df[p_col] = (
                     forecast_values_df[p_col] - forecast_values_df["adjust_mw"]
@@ -147,29 +150,26 @@ def map_values_df_to_dp_requests(
     p50s = forecast_values_df["p50_mw"].values.astype(float)
     p50s = p50s * 1 * 10**6 / float(capacity_watts)
 
-    # add p10s and p90s if they exist
-    if "p10_mw" in forecast_values_df.columns:
-        p10s = forecast_values_df["p10_mw"].values.astype(float)
-        p10s = p10s * 1 * 10**6 / float(capacity_watts)
-    else:
-        p10s = [None] * len(p50s)
-    if "p90_mw" in forecast_values_df.columns:
-        p90s = forecast_values_df["p90_mw"].values.astype(float)
-        p90s = p90s * 1 * 10**6 / float(capacity_watts)
-    else:
-        p90s = [None] * len(p50s)
+    # convert each available plevel to a fraction of capacity
+    p_fractions = {}
+    for p in other_p_levels:
+        p_col = f"p{p}_mw"
+        if p_col in forecast_values_df.columns:
+            p_fractions[p] = (
+                forecast_values_df[p_col].values.astype(float) * 1 * 10**6 / float(capacity_watts)
+            )
 
     forecast_values = []
-    for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
+    for i, (h, p50) in enumerate(zip(horizons_mins, p50s, strict=True)):
         if h < 0:
             # skip negative horizons
             continue
 
-        other_statistics_fractions = {}
-        if p10 is not None:
-            other_statistics_fractions["p10"] = p10
-        if p90 is not None:
-            other_statistics_fractions["p90"] = p90
+        other_statistics_fractions = {
+            f"p{p:02d}": fractions[i]
+            for p, fractions in p_fractions.items()
+            if not pd.isna(fractions[i])
+        }
 
         forecast_values.append(
             dp.CreateForecastRequestForecastValue(

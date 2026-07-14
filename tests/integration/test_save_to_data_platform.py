@@ -84,9 +84,13 @@ async def test_save_to_generation_to_data_platform(client):
     # setup: make fake data
     fake_data = pd.DataFrame(
         {
+            "p2_mw": [0.2] * 24,
             "p10_mw": [0.3] * 24,
+            "p25_mw": [0.4] * 24,
             "p50_mw": [0.5] * 24,
+            "p75_mw": [0.6] * 24,
             "p90_mw": [0.7] * 24,
+            "p98_mw": [0.8] * 24,
             "adjust_mw": [0.1] * 24,
             "target_datetime_utc": pd.Timestamp("2025-01-01")
             + pd.timedelta_range(
@@ -143,6 +147,12 @@ async def test_save_to_generation_to_data_platform(client):
     count = 0
     async for d in stream_forecast_data_response:
         assert d.p50_fraction == 0.5
+        # all 6 non-p50 plevels are saved, with zero-padded keys (e.g. "p02")
+        other = dict(d.other_statistics_fractions)
+        assert set(other.keys()) == {"p02", "p10", "p25", "p75", "p90", "p98"}
+        assert other["p02"] == pytest.approx(0.2)
+        assert other["p10"] == pytest.approx(0.3)
+        assert other["p98"] == pytest.approx(0.8)
         count += 1
     assert count == 24
 

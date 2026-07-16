@@ -28,7 +28,11 @@ def test_add_legacy_gsp_results_none_added():
 
     # Add your assertions here
     assert len(result) == 2
-    
+
+    # check first timestamp is 2023-01-01
+    assert result[0]["target_datetime_utc"].iloc[0] == pd.Timestamp("2023-01-01")
+    assert result[1]["target_datetime_utc"].iloc[1] == pd.Timestamp("2023-01-01 00:30")
+
 def test_add_legacy_gsp_results():
     # Add your test implementation here
 

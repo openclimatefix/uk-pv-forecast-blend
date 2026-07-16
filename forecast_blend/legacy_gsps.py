@@ -1,11 +1,9 @@
 
-import logging
+from loguru import logger
 import yaml
 import os
 from pydantic import BaseModel, Field
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 
 class GSPMergeSource(BaseModel):
@@ -64,7 +62,8 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
     """
 
     legacy_gsps = load_gsp_merge_weights()
-    select_cols = ["p10_mw", "p50_mw", "p90_mw","adjust_mw"]
+    select_cols = ["p50_mw", "adjust_mw"]
+    # Note that current gsps for blend we only save p50
 
     # lets not let this be changed in place
     forecast_values_by_gsp_id = forecast_values_by_gsp_id.copy()
@@ -100,19 +99,16 @@ def add_legacy_gsp_results(forecast_values_by_gsp_id:dict[int, pd.DataFrame]) ->
         # Concatenate all weighted sources and sum every numeric column in one pass.
         # generation_mw reflects the applied weights; capacity columns are summed across sources.
         # datetime_gmt is the groupby key (not summed); the rest are numeric aggregates.
-        all_cols = ["p10_mw", "p50_mw", "p90_mw", "adjust_mw"] + ["target_datetime_utc"]
+        all_cols = select_cols + ["target_datetime_utc"]
         base = (
             pd.concat([df[all_cols] for df in source_dfs], ignore_index=True)
             .groupby("target_datetime_utc", as_index=False)
             .sum()
         )
-        # change the index to a column with name target_datetime_utc
-        base["target_datetime_utc"] = base.index
-        base.reset_index(drop=True, inplace=True)
 
-        logger.debug(
+        logger.info(
             f"GSP ID {target_gsp_id} reconstruction complete: "
-            f"{len(source_dfs)} source(s) combined, "
+            f"{len(source_dfs)} source(s) combined, new forecast is {base.shape[0]} rows"
         )
 
         forecast_values_by_gsp_id[target_gsp_id] = base

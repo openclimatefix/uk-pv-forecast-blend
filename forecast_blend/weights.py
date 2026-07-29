@@ -11,8 +11,8 @@ from loguru import logger
 from ocf import dp
 
 
-DAY_AHEAD_MODEL_NAMES = ["pvnet_day_ahead"]
-INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_ecmwf", "pvnet_cloud"]
+DAY_AHEAD_MODEL_NAMES = ["pvnet_ukv_only", "pvnet_day_ahead", "pvnet_ecmwf"]
+INTRADAY_MODEL_NAMES = ["pvnet_v2"]
 ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
 
 BLEND_KERNEL = [0.75, 0.5, 0.25]
@@ -298,6 +298,39 @@ def index_of_last_non_nan_value(x: np.ndarray) -> int:
         return len(x) - 1
 
 
+def infer_backup_model_name(df_mae: pd.DataFrame) -> str:
+    """Infer the backup model name from the DataFrame of horizon-MAE values
+    
+    The backup model is the one which has the longest forecast horizon in the input DataFrame. Ties 
+    are broken by lowest average MAE.
+
+    Args:
+        df_mae: DataFrame of horizon-MAE values for all models under consideration. These should 
+            have beeen modified for the delay of the latest model run.
+    
+    Returns:
+        The name of the backup model
+    """
+
+    # Store the model names, max horizon, and average MAEs
+    candidates: list[tuple[str, pd.Timedelta, float]] = []
+
+    for model_name in df_mae.columns:
+        model_mae = df_mae[model_name].dropna()
+        if model_mae.empty:
+            continue
+
+        candidates.append((model_name, model_mae.index.max(), model_mae.mean()))
+
+    if not candidates:
+        logger.warning("Cannot infer backup model from empty MAE data. Returning first.")
+        return df_mae.columns[0]
+
+    # Choose the model with the longest forecast horizon, and if tied, the lowest average MAE
+    backup_model_name, _, _ = max(candidates, key=lambda item: (item[1], -item[2]))
+    return backup_model_name
+
+
 def calculate_optimal_blend_weights(
     df_mae: pd.DataFrame, 
     backup_model_name: str, 
@@ -459,10 +492,13 @@ async def get_national_blend_weights(
     # Construct the expected horizon-MAE values for each model run with the current delays
     df_delayed_mae = delay_horizon_maes(df_mae, model_delays_dict)
     
+    # Use the model with the longest forecast horizon as the backup model for the day-ahead blend
+    da_backup_model_name = infer_backup_model_name(df_delayed_mae[all_model_names])
+
     # Calculate the optimal blend weights between day-ahead models
     df_da_model_weights = calculate_optimal_blend_weights(
         df_delayed_mae[all_model_names], 
-        backup_model_name="pvnet_day_ahead",
+        backup_model_name=da_backup_model_name,
         kernel=BLEND_KERNEL, 
         score_func=make_avg_mae_func(36),
     )
@@ -559,11 +595,14 @@ async def get_regional_blend_weights(
 
     # Construct the expected horizon-MAE values for each model run with the current delays
     df_delayed_mae = delay_horizon_maes(df_mae, model_delays_dict)
+
+    # Use the model with the longest forecast horizon as the backup model for the day-ahead blend
+    da_backup_model_name = infer_backup_model_name(df_delayed_mae[all_regional_models])
     
     # Calculate the optimal blend weights between day-ahead models
     weights_df = calculate_optimal_blend_weights(
         df_delayed_mae[all_regional_models], 
-        backup_model_name="pvnet_day_ahead", 
+        backup_model_name=da_backup_model_name, 
         kernel=BLEND_KERNEL, 
         score_func=make_avg_mae_func(8),
     )

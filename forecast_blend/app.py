@@ -21,8 +21,7 @@ from forecast_blend.legacy_gsps import add_legacy_gsp_results
 from forecast_blend.utils import get_start_datetime
 from forecast_blend.weights import (
     backfill_weights, 
-    get_national_blend_weights, 
-    get_regional_blend_weights,
+    get_blend_weights, 
 )
 from forecast_blend.save import fetch_dp_gsp_uuid_map, save_forecast_to_data_platform, get_metadata
 from forecast_blend.forecast.data_platform import get_data_platform_connection
@@ -74,14 +73,10 @@ async def app(gsps: list[int] | None = None) -> None:
     async with Channel(host=host, port=port) as channel:
         client = dp.DataPlatformDataServiceStub(channel)
 
-        national_weights_df = await get_national_blend_weights(client, t0, exclude_models)
-        regional_weights_df = await get_regional_blend_weights(client, t0, exclude_models)
+        weights_df = await get_blend_weights(client, t0, exclude_models)
+        weights_df = backfill_weights(weights_df, start_datetime)
 
-        national_weights_df = backfill_weights(national_weights_df, start_datetime)
-        regional_weights_df = backfill_weights(regional_weights_df, start_datetime)
-
-        logger.info(f"Weights for national blend: {national_weights_df}")
-        logger.info(f"Weights for regional blend: {regional_weights_df}")
+        logger.info(f"Weights for blend: {weights_df}")
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
 
         for gsp_id in gsps:
@@ -90,7 +85,7 @@ async def app(gsps: list[int] | None = None) -> None:
                 forecast_values_df = await get_blend_forecast_values_latest(
                     gsp_id=gsp_id,
                     start_datetime=start_datetime,
-                    weights_df=national_weights_df if gsp_id == 0 else regional_weights_df,
+                    weights_df=weights_df,
                     gsp_uuid_map=gsp_uuid_map,
                     dp_client=client,
                 )

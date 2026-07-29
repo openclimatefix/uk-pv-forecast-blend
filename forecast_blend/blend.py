@@ -35,7 +35,7 @@ async def get_blend_forecast_values_latest(
 
     :param gsp_id: gsp id, to filter query on
     :param weights_df: dataframe of weights to use for blending,
-        see structure in weights.py - get_national_blend_weights
+        see structure in weights.py - get_blend_weights
     :param start_datetime: optional to filter target_time by start_datetime
         If None is given then all are returned.
     :param gsp_uuid_map: optional pre-fetched GSP UUID map from Data Platform

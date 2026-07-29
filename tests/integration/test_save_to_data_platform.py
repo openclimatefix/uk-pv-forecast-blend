@@ -15,6 +15,7 @@ from ocf import dp
 from grpclib.client import Channel
 import pytest_asyncio
 from testcontainers.core.container import DockerContainer
+from testcontainers.core.network import Network
 from testcontainers.postgres import PostgresContainer
 from importlib.metadata import version
 
@@ -31,33 +32,35 @@ def client():
 
     # we use a specific postgres image with postgis and pgpartman installed
     # TODO make a release of this, not using logging tag.
-    with PostgresContainer(
-        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
-        username="postgres",
-        password="postgres",  #noqa: S106
-        dbname="postgres",
-        env={"POSTGRES_HOST": "db"},
-    ) as postgres:
-        database_url = postgres.get_connection_url()
-        # we need to get ride of psycopg2, so the go driver works
-        database_url = database_url.replace("postgresql+psycopg2", "postgres")
-        # we need to change to host.docker.internal so the data platform container can see it
-        # https://stackoverflow.com/questions/46973456/docker-access-localhost-port-from-container
-        database_url = database_url.replace("localhost", "host.docker.internal")
+    # Both containers share a network so the data-platform server can reach postgres
+    # by its "db" alias. get_connection_url() would return the host-exposed port,
+    # which isn't what postgres listens on from inside the network.
+    with Network() as network:
+        with PostgresContainer(
+            f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
+            username="postgres",
+            password="postgres",  #noqa: S106
+            dbname="postgres",
+            env={"POSTGRES_HOST": "db"},
+            network=network,
+            network_aliases=["db"],
+        ) as postgres:
+            database_url = f"postgres://postgres:postgres@db:{postgres.port}/postgres"
 
-        with DockerContainer(
-            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
-            env={"DATABASE_URL": database_url},
-            ports=[50051],
-        ) as data_platform_server:
-            time.sleep(1)  # Give some time for the server to start
+            with DockerContainer(
+                image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
+                env={"DATABASE_URL": database_url},
+                ports=[50051],
+                network=network,
+            ) as data_platform_server:
+                time.sleep(1)  # Give some time for the server to start
 
-            port = data_platform_server.get_exposed_port(50051)
-            host = data_platform_server.get_container_host_ip()
-            channel = Channel(host=host, port=port)
-            client = dp.DataPlatformDataServiceStub(channel)
-            yield client
-            channel.close()
+                port = data_platform_server.get_exposed_port(50051)
+                host = data_platform_server.get_container_host_ip()
+                channel = Channel(host=host, port=port)
+                client = dp.DataPlatformDataServiceStub(channel)
+                yield client
+                channel.close()
 
 
 @pytest.mark.asyncio(loop_scope="session")

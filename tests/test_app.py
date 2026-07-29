@@ -188,8 +188,7 @@ async def test_app_only_ecmwf_and_day_ahead(data_client):
 
     mock_weights = pd.DataFrame({"pvnet_ecmwf": ecmwf_weights, "pvnet_day_ahead": day_ahead_weights})
 
-    with patch("forecast_blend.app.get_national_blend_weights", new=AsyncMock(return_value=mock_weights)), \
-         patch("forecast_blend.app.get_regional_blend_weights", new=AsyncMock(return_value=mock_weights)):
+    with patch("forecast_blend.app.get_blend_weights", new=AsyncMock(return_value=mock_weights)):
         await app(gsps=[0])
 
     locations_resp = await data_client.list_locations(dp.ListLocationsRequest(

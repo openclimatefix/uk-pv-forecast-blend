@@ -52,7 +52,13 @@ async def app(gsps: list[int] | None = None) -> None:
     blend_name = os.getenv("BLEND_NAME", "blend")
     allow_cloudcasting = os.getenv("ALLOW_CLOUDCASTING", "false").lower()=="true"
 
-    exclude_models = None if allow_cloudcasting else ["pvnet_cloud"]
+    if allow_cloudcasting:
+        logger.warning(
+            "ALLOW_CLOUDCASTING is enabled, but pvnet_cloud is not included "
+            "in blending until MAE weights are available."
+        )
+
+    exclude_models = ["pvnet_cloud"]
 
     if gsps is None:
         n_gsps = int(os.getenv("N_GSP", N_GSP))

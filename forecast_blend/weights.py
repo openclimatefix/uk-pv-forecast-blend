@@ -466,7 +466,8 @@ async def get_national_blend_weights(
         all_model_names = [*ALL_MODEL_NAMES]
     else:
         all_model_names = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
-        df_mae = df_mae.drop(columns=exclude_models)
+        # TODO: Remove `errors="ignore"` once we have cloudcasting MAE weights available
+        df_mae = df_mae.drop(columns=exclude_models, errors="ignore")
     
     # We need to have MAE-horizon values for all potential models
     assert len(set(all_model_names) - set(df_mae.columns))==0
@@ -569,7 +570,8 @@ async def get_regional_blend_weights(
 
     df_mae = get_horizon_maes()
     if exclude_models:
-        df_mae = df_mae.drop(columns=exclude_models)
+        # TODO: Remove `errors="ignore"` once we have cloudcasting MAE weights available
+        df_mae = df_mae.drop(columns=exclude_models, errors="ignore")
 
     # We need to have MAE-horizon values for all potential models
     all_regional_models = [m for m in ALL_MODEL_NAMES if m not in exclude_models]

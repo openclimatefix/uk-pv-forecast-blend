@@ -18,6 +18,7 @@ from ocf import dp
 from grpclib.client import Channel
 import pytest_asyncio
 from testcontainers.core.container import DockerContainer
+from testcontainers.core.network import Network
 from testcontainers.postgres import PostgresContainer
 from importlib.metadata import version
 
@@ -47,30 +48,35 @@ async def dp_client():
     """
     Fixture to spin up a PostgreSQL container and Data Platform for reading tests.
     """
-    with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:0.21.2",
-        username="postgres",
-        password="postgres",  # noqa: S106
-        dbname="postgres",
-        env={"POSTGRES_HOST": "db"},
-    ) as postgres:
-        database_url = postgres.get_connection_url()
-        database_url = database_url.replace("postgresql+psycopg2", "postgres")
-        database_url = database_url.replace("localhost", "host.docker.internal")
+    # Both containers share a network so the data-platform server can reach postgres
+    # by its "db" alias. get_connection_url() would return the host-exposed port,
+    # which isn't what postgres listens on from inside the network.
+    with Network() as network:
+        with PostgresContainer(
+            f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
+            username="postgres",
+            password="postgres",  # noqa: S106
+            dbname="postgres",
+            env={"POSTGRES_HOST": "db"},
+            network=network,
+            network_aliases=["db"],
+        ) as postgres:
+            database_url = f"postgres://postgres:postgres@db:{postgres.port}/postgres"
 
-        with DockerContainer(
-            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
-            env={"DATABASE_URL": database_url},
-            ports=[50051],
-        ) as data_platform_server:
-            time.sleep(2)  # Give some time for the server to start
+            with DockerContainer(
+                image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
+                env={"DATABASE_URL": database_url},
+                ports=[50051],
+                network=network,
+            ) as data_platform_server:
+                time.sleep(2)  # Give some time for the server to start
 
-            port = data_platform_server.get_exposed_port(50051)
-            host = data_platform_server.get_container_host_ip()
-            channel = Channel(host=host, port=port)
-            client = dp.DataPlatformDataServiceStub(channel)
-            yield client, host, port
-            channel.close()
+                port = data_platform_server.get_exposed_port(50051)
+                host = data_platform_server.get_container_host_ip()
+                channel = Channel(host=host, port=port)
+                client = dp.DataPlatformDataServiceStub(channel)
+                yield client, host, port
+                channel.close()
 
 
 @pytest_asyncio.fixture(scope="module")

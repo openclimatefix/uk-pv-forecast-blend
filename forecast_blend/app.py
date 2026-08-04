@@ -17,7 +17,7 @@ from grpclib.client import Channel
 
 
 from forecast_blend.blend import get_blend_forecast_values_latest
-from forecast_blend.legacy_gsps import add_legacy_gsp_results
+from forecast_blend.legacy_gsps import add_legacy_gsp_results, load_gsp_merge_weights
 from forecast_blend.utils import get_start_datetime
 from forecast_blend.weights import (
     backfill_weights, 
@@ -79,7 +79,20 @@ async def app(gsps: list[int] | None = None) -> None:
         logger.info(f"Weights for blend: {weights_df}")
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
 
-        for gsp_id in gsps:
+        # Legacy GSPs are no longer forecast by the models, they are reconstructed from their
+        # source GSPs after blending. Attempting to blend them would/did either pick up a stale
+        # forecast (blocking the reconstruction below) or raise once that forecast runs out,
+        # so if we skip them here on purpose, we can always rebuild them.
+        legacy_gsp_ids = set(load_gsp_merge_weights().keys())
+        gsps_to_blend = [gsp_id for gsp_id in gsps if gsp_id not in legacy_gsp_ids]
+        skipped_legacy = sorted(set(gsps) & legacy_gsp_ids)
+        if skipped_legacy:
+            logger.info(
+                f"Skipping blend for legacy GSP ids {skipped_legacy}, "
+                f"these are reconstructed from their source gsps"
+            )
+
+        for gsp_id in gsps_to_blend:
             logger.info(f"Blending forecasts for gsp id {gsp_id}")
             try:
                 forecast_values_df = await get_blend_forecast_values_latest(
@@ -96,6 +109,21 @@ async def app(gsps: list[int] | None = None) -> None:
 
         # add legacy gsps results
         forecast_values_by_gsp_id = add_legacy_gsp_results(forecast_values_by_gsp_id)
+
+        # Only save GSPs we have a location for. Saving indexes gsp_uuid_map by gsp id, so a
+        # single gsp without a location would raise and prevent the save for every GSP.
+        # (right now the legacy GSPs could be the likely cause of this)
+        gsps_without_location = sorted(set(forecast_values_by_gsp_id) - set(gsp_uuid_map))
+        if gsps_without_location:
+            logger.warning(
+                f"No data platform location for GSP ids {gsps_without_location}, "
+                f"dropping them from the save"
+            )
+            forecast_values_by_gsp_id = {
+                gsp_id: values
+                for gsp_id, values in forecast_values_by_gsp_id.items()
+                if gsp_id in gsp_uuid_map
+            }
 
         # Save to Data Platform
         logger.info("Saving forecast to data platform")

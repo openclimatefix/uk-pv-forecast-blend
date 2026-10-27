@@ -12,7 +12,7 @@ from ocf import dp
 
 
 DAY_AHEAD_MODEL_NAMES = ["pvnet_ukv_only", "pvnet_day_ahead", "pvnet_ecmwf"]
-INTRADAY_MODEL_NAMES = ["pvnet_v2"]
+INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_cloud"]
 ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
 
 BLEND_KERNEL = [0.75, 0.5, 0.25]
@@ -466,8 +466,7 @@ async def get_blend_weights(
         all_model_names = [*ALL_MODEL_NAMES]
     else:
         all_model_names = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
-        # TODO: Remove `errors="ignore"` once we have cloudcasting MAE weights available
-        df_mae = df_mae.drop(columns=exclude_models, errors="ignore")
+        df_mae = df_mae.drop(columns=exclude_models)
     
     # We need to have MAE-horizon values for all potential models
     assert len(set(all_model_names) - set(df_mae.columns))==0

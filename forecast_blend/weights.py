@@ -213,14 +213,14 @@ def delay_horizon_maes(
     
     if len(mae_models - delay_models)>0:
         skipped_models = mae_models - delay_models
-        logger.warn(
+        logger.warning(
             f"The following models have saved MAES but were not available {skipped_models}. "
             "These models will be skipped in consideration for the blend."
         
         )
     if len(delay_models - mae_models)>0:
         skipped_models = delay_models - mae_models
-        logger.warn(
+        logger.warning(
             f"The following models are available but do not have saved MAEs {skipped_models}. "
             "These models will be skipped in consideration for the blend."
         )

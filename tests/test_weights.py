@@ -89,7 +89,6 @@ test_settings = [(None, "pvnet_cloud"),  (["pvnet_cloud"], "pvnet_v2")]
 @time_machine.travel("2023-01-01 00:00:01")
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.parametrize("exclude_models, intraday_model", test_settings)
-@pytest.mark.skip(reason="Cloudcasting MAE weights are not available.")
 async def test_get_blend_weights_cloud(exclude_models, intraday_model):
     t0 = pd.Timestamp("2023-01-01 00:00", tz="UTC")
 

@@ -4,6 +4,7 @@ import asyncio
 import numpy as np
 import os
 import pandas as pd
+from collections.abc import Collection
 from typing import Awaitable, Callable
 from datetime import timezone
 from loguru import logger
@@ -11,9 +12,9 @@ from loguru import logger
 from ocf import dp
 
 
-DAY_AHEAD_MODEL_NAMES = ["pvnet_ukv_only", "pvnet_day_ahead", "pvnet_ecmwf"]
-INTRADAY_MODEL_NAMES = ["pvnet_v2", "pvnet_cloud"]
-ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES + INTRADAY_MODEL_NAMES
+DAY_AHEAD_MODEL_NAMES = frozenset({"pvnet_ukv_only", "pvnet_day_ahead", "pvnet_ecmwf"})
+INTRADAY_MODEL_NAMES = frozenset({"pvnet_v2", "pvnet_cloud"})
+ALL_MODEL_NAMES = DAY_AHEAD_MODEL_NAMES | INTRADAY_MODEL_NAMES
 
 BLEND_KERNEL = [0.75, 0.5, 0.25]
 MIN_FORECAST_HORIZON = pd.Timedelta("30min")
@@ -29,7 +30,18 @@ def get_horizon_maes() -> pd.DataFrame:
     filepath = os.path.dirname(os.path.realpath(__file__)) + '/data/model_horizon_mae_scores.csv'
     df_maes = pd.read_csv(filepath, index_col=0).reset_index(names="horizon")
     df_maes["horizon"] = pd.to_timedelta(df_maes["horizon"]).to_numpy()
-    return df_maes.set_index("horizon")
+    df_maes = df_maes.set_index("horizon")
+
+    # ----------------------------------------------------------------------------------------------
+    # NOTE: This is a hack which sets the pvnet_cloud model MAE to 10% higher than the pvnet_v2
+    # model for the first (30 minutes) horizon. This is a temporary fix for some production 
+    # weirdness
+    # TODO: Remove when no longer required
+    h_limit = pd.Timedelta("30min")
+    df_maes.loc[h_limit, "pvnet_cloud"] = df_maes.loc[h_limit, "pvnet_v2"] * 1.1
+    # ----------------------------------------------------------------------------------------------
+
+    return df_maes
 
 
 async def _list_national_locations(client: dp.DataPlatformDataServiceStub) -> list:
@@ -56,7 +68,7 @@ async def _list_gsp_locations(client: dp.DataPlatformDataServiceStub) -> list:
 
 async def _fetch_latest_forecast_metadata_from_dp(
     client: dp.DataPlatformDataServiceStub,
-    model_names: list[str],
+    model_names: set[str],
     t0: pd.Timestamp,
     max_delay: pd.Timedelta,
     list_locations_fn: Callable[[dp.DataPlatformDataServiceStub], Awaitable[list]],
@@ -65,7 +77,7 @@ async def _fetch_latest_forecast_metadata_from_dp(
     """Gets the most recent forecast metadata from Data Platform.
 
     Args:
-        model_names: List of model names (forecaster tags) to filter to
+        model_names: Model names (forecaster tags) to filter to
         t0: The blend forecast init-time
         max_delay: Max delay with respect to t0 to consider using forecast in the blend
         list_locations_fn: Async function returning the locations to fetch forecasts for
@@ -75,7 +87,6 @@ async def _fetch_latest_forecast_metadata_from_dp(
         A pandas DataFrame with columns 'created_utc', 'forecast_creation_time',
         'location_id', and 'name' (model name) representing the latest forecasts
     """
-
 
     t0_datetime = t0.to_pydatetime().replace(tzinfo=timezone.utc)
     earliest_creation_time = t0_datetime - max_delay
@@ -95,7 +106,6 @@ async def _fetch_latest_forecast_metadata_from_dp(
     ]
 
     responses = await asyncio.gather(*tasks, return_exceptions=True)
-
 
     rows = []
     for response in responses:
@@ -132,7 +142,7 @@ async def _fetch_latest_forecast_metadata_from_dp(
 
 async def get_latest_forecast_metadata(
     client: dp.DataPlatformDataServiceStub,
-    model_names: list[str],
+    model_names: set[str],
     t0: pd.Timestamp,
     max_delay: pd.Timedelta,
     location_type: str,
@@ -141,7 +151,7 @@ async def get_latest_forecast_metadata(
 
     Args:
         client: Data Platform stub to use for requests
-        model_names: List of model names to filter to
+        model_names: Model names to filter to
         t0: The blend forecast init-time
         max_delay: Max delay with respect to t0 to consider using forecast in the blend
         location_type: "national" or "regional" — selects which locations to list
@@ -166,7 +176,6 @@ async def get_latest_forecast_metadata(
         max_delay=max_delay,
         list_locations_fn=list_locations_fn,
     )
-
 
 
 def get_model_delays(df_forecast_ids: pd.DataFrame, t0: pd.Timestamp) -> dict[str, pd.Timedelta]:
@@ -200,7 +209,7 @@ def delay_horizon_maes(
 ) -> pd.DataFrame:
     """Construct the expected horizon-MAE for each model run with given delays
     
-    Arga:
+    Args:
         df_mae: The horizon-MAE results for each model without runtime delays
         delays_dict: The current delay of each model
 
@@ -236,7 +245,6 @@ def delay_horizon_maes(
         )
 
         delayed_model_horizon_mae_dfs.append(df)
-
 
     df_delayed_maes = pd.concat(delayed_model_horizon_mae_dfs, axis=1).sort_index()
     
@@ -279,15 +287,32 @@ def make_blend_weights_array(size: int, blend_start_index: int, kernel: list[flo
         >>> make_blend_weights_array(6, 1, [])
         array([1., 0., 0., 0., 0., 0.])
     """
-    
+
+    k_size = len(kernel)
+
+    if blend_start_index <= -k_size:
+        raise ValueError(
+            "The blend_start_index chosen sets the entire blend kernel to be before the first "
+            "forecast step. Please choose a larger blend_start_index."
+        )
+    if blend_start_index >= size:
+        raise ValueError(
+            "The blend_start_index chosen sets the entire blend kernel to be after the last "
+            "forecast step. Please choose a smaller blend_start_index."
+        )
+
+    start_index = max(blend_start_index, 0)
+    end_index = min(blend_start_index + k_size, size)
+
     weights = np.zeros(size)
-    weights[:blend_start_index] = 1
-    weights[blend_start_index:blend_start_index+len(kernel)] = kernel
+    weights[:start_index] = 1
+    kernel_slice = slice(start_index - blend_start_index, end_index - blend_start_index)
+    weights[start_index:end_index] = kernel[kernel_slice]
     return weights
 
 
 def index_of_last_non_nan_value(x: np.ndarray) -> int:
-    """Find the index position of the last non-NaN value in the arreay
+    """Find the index position of the last non-NaN value in the array
 
     Args:
         x: The input array
@@ -306,7 +331,7 @@ def infer_backup_model_name(df_mae: pd.DataFrame) -> str:
 
     Args:
         df_mae: DataFrame of horizon-MAE values for all models under consideration. These should 
-            have beeen modified for the delay of the latest model run.
+            have been modified for the delay of the latest model run.
     
     Returns:
         The name of the backup model
@@ -331,7 +356,7 @@ def infer_backup_model_name(df_mae: pd.DataFrame) -> str:
     return backup_model_name
 
 
-def calculate_optimal_blend_weights(
+def calculate_best_pairwise_blend(
     df_mae: pd.DataFrame, 
     backup_model_name: str, 
     kernel: list[float], 
@@ -342,8 +367,8 @@ def calculate_optimal_blend_weights(
     This function chooses up to one model which will be blended into the backup model
     
     Args:
-        df_mae: DataFrame of horizon-MAE values for all models under consideration. These should have beeen
-            modified for the delay of the latest model run.
+        df_mae: DataFrame of horizon-MAE values for all models under consideration. These should 
+            have been modified for the delay of the latest model run.
         backup_model_name: The default model which all other models will be blended into
         kernel: The blend kernel
         score_func: The function of MAE which will be minimised
@@ -356,7 +381,7 @@ def calculate_optimal_blend_weights(
     assert (kernel<1).all()
     assert (np.diff(kernel)<=0).all()
     
-    # Not all models predict out to the max horizon in the input DataFrme
+    # Not all models predict out to the max horizon in the input DataFrame
     # We fill these model MAE horizons with a high value so they will be penalised
     # and therefore not selected
     fill_val = np.nanmax(df_mae.values)*10
@@ -392,7 +417,8 @@ def calculate_optimal_blend_weights(
                 
         else:
             max_blend_start_pos = last_non_nan_idx - len(kernel) + 1
-            for position in range(max_blend_start_pos + 1):
+            min_blend_start_pos = -len(kernel) + 1
+            for position in range(min_blend_start_pos, max_blend_start_pos + 1):
 
                 # We don't allow the blend to start before the first forecast step
                 if df_mae.index[position]<MIN_FORECAST_HORIZON:
@@ -430,109 +456,244 @@ def calculate_optimal_blend_weights(
     return pd.DataFrame(blend_results, index=df_mae.index)
 
 
+def add_best_candidate_to_blend(
+    df_mae: pd.DataFrame,
+    df_blend_weights: pd.DataFrame,
+    candidate_names: set[str],
+    kernel: list[float],
+    score_func: Callable[[pd.Series], float],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Blend up to one candidate model into the previous stage's blend
+
+    Args:
+        df_mae: DataFrame of horizon-MAE values for all models under consideration. These should 
+            have been modified for the delay of the latest model run. Must also contain a
+            "blend" column holding the horizon-MAE of the previous stage's blend.
+        df_blend_weights: The blend weights from the previous stage, with one column per model
+            already in the blend. These will be scaled by how much the previous stage's blend is
+            used in this stage.
+        candidate_names: Models which may be blended into the previous stage's blend. Up to one
+            of these will be chosen. None of these should already be in df_blend_weights.
+        kernel: The blend kernel
+        score_func: The function of MAE which will be minimised
+
+    Returns:
+        A tuple of:
+        - df_mae with the "blend" column updated to the horizon-MAE of the new blend
+        - The blend weights for the new blend, with one column per model used
+    """
+    if missing := {"blend", *candidate_names} - set(df_mae.columns):
+        raise ValueError(
+            f"df_mae is missing required columns: {sorted(missing)}. It must contain "
+            "a 'blend' column (the previous stage's blend MAE) and a column for each candidate "
+            f"model. Available columns: {list(df_mae.columns)}"
+        )
+
+    if overlap := candidate_names & set(df_blend_weights.columns):
+        raise ValueError(
+            f"Candidates {sorted(overlap)} are already in the blend from a previous stage"
+        )
+
+    # Calculate the optimal blend weights for the candidates against the current blend
+    df_candidate_blend_weights = calculate_best_pairwise_blend(
+        df_mae[[*sorted(candidate_names), "blend"]],
+        backup_model_name="blend",
+        kernel=kernel,
+        score_func=score_func,
+    )
+
+    # Calculate the weighted horizon-MAE for the new blend
+    mask = df_mae[df_candidate_blend_weights.columns].notnull().any(axis=1)
+    blend_mae = (
+        (df_candidate_blend_weights.fillna(0) * df_mae[df_candidate_blend_weights.columns])
+        .sum(skipna=True, axis=1)
+        .where(mask)
+    )
+    df_new_delayed_mae = df_mae.assign(blend=blend_mae)
+
+    # The previous stage blend weights must be multiplied by how much we are using that blend
+    df_scaled_blend_weights = df_blend_weights.mul(df_candidate_blend_weights["blend"], axis=0)
+
+    df_new_blend_weights = pd.concat(
+        [df_scaled_blend_weights, df_candidate_blend_weights.drop(columns="blend")],
+        axis=1
+    )
+
+    # Remove models whose weight has been reduced to zero at every horizon by this stage
+    df_new_blend_weights = df_new_blend_weights.loc[:, df_new_blend_weights.sum(axis=0) > 0]
+
+    return df_new_delayed_mae, df_new_blend_weights
+
+
+def calculate_hierarchical_blend(
+    df_mae: pd.DataFrame,
+    model_delays_dict: dict[str, pd.Timedelta],
+) -> pd.DataFrame:
+    """Calculate blend weights from the horizon-MAE curves and current model delays
+
+    We create a hierarchical blend using up to 4 models. A backup model is chosen as the model
+    with the longest available forecast horizon. Then up to one of the other day-ahead models is
+    blended into it. Then, optionally, pvnet_cloud is blended in. Finally, up to one of the
+    remaining intraday models is blended in. At each stage a model is only blended in if it
+    improves the expected MAE over that stage's scoring window.
+
+    Args:
+        df_mae: Horizon-MAE values for each candidate model (columns), without delays
+        model_delays_dict: Current delay of each model. Must contain a delay for every model
+            in df_mae
+
+    Returns:
+        A DataFrame of blend weights:
+        - Index: Forecast horizon (pd.Timedelta)
+        - Columns: The models used in the blend. Models which are unavailable or not chosen do not 
+          appear
+        - Values: Weights between 0 and 1. At each horizon the weights of the available
+          models sum to 1. Weights are NaN where a model has no forecast for that horizon
+    """
+
+    if df_mae.empty:
+        raise ValueError("df_mae is empty")
+
+    if missing_delays := set(df_mae.columns) - set(model_delays_dict):
+        raise ValueError(
+            f"Models {sorted(missing_delays)} are in df_mae but have no delay in "
+            "model_delays_dict. Remove them from df_mae if they are unavailable."
+        )
+
+    # Construct the expected horizon-MAE values for each model run with the current delays
+    df_delayed_mae = delay_horizon_maes(df_mae, model_delays_dict)
+
+    # Drop candidate models which have no future predictions and therefore have all NaN MAE curves
+    df_delayed_mae = df_delayed_mae.dropna(axis=1, how="all")
+
+    if df_delayed_mae.empty:
+        raise ValueError("No models have forecasts available for the future")
+
+    all_candidate_models = set(df_delayed_mae.columns)
+
+    # Use the model with the longest forecast horizon as the backup model
+    backup_model_name = infer_backup_model_name(df_delayed_mae)
+
+    # Initialize the blend weights to be 100% backup model
+    df_blend_weights = pd.DataFrame(
+        {backup_model_name: np.ones(len(df_delayed_mae))}, 
+        index=df_delayed_mae.index
+    )
+
+    # Initialize the blend MAE to be the backup model's MAE
+    df_delayed_mae["blend"] = df_delayed_mae[backup_model_name]
+
+    # Blend stage 1: Blend in the available day-ahead models (excluding the backup model)
+    other_day_ahead_models = (
+        all_candidate_models & DAY_AHEAD_MODEL_NAMES - set(df_blend_weights.columns)
+    )
+    if other_day_ahead_models:
+        df_delayed_mae, df_blend_weights = add_best_candidate_to_blend(
+            df_mae=df_delayed_mae,
+            df_blend_weights=df_blend_weights,
+            candidate_names=other_day_ahead_models, 
+            kernel=BLEND_KERNEL, 
+            score_func=make_avg_mae_func(36),
+        )
+
+    # Blend stage 2: Blend the pvnet_cloud model into the previous stage's blend unless its not
+    # included or it was chosen as the backup model
+    if "pvnet_cloud" in all_candidate_models and "pvnet_cloud" not in df_blend_weights.columns:
+        df_delayed_mae, df_blend_weights = add_best_candidate_to_blend(
+            df_mae=df_delayed_mae,
+            df_blend_weights=df_blend_weights,
+            candidate_names={"pvnet_cloud"},
+            kernel=BLEND_KERNEL,
+            score_func=make_avg_mae_func(8),
+        )
+
+    # Blend stage 3: Blend the other available intraday models into the previous stage's blend
+    other_intraday_models = (
+        all_candidate_models & INTRADAY_MODEL_NAMES - set(df_blend_weights.columns) - {"pvnet_cloud"}
+    )
+
+    if other_intraday_models:
+        df_delayed_mae, df_blend_weights = add_best_candidate_to_blend(
+            df_mae=df_delayed_mae,
+            df_blend_weights=df_blend_weights,
+            candidate_names=other_intraday_models,
+            kernel=BLEND_KERNEL,
+            score_func=make_avg_mae_func(8),
+        )
+
+    return df_blend_weights
+
+
 async def get_blend_weights(
     client: dp.DataPlatformDataServiceStub,
     t0: pd.Timestamp, 
-    exclude_models: list[str] | None = None,
+    exclude_models: Collection[str] | None = None,
 ) -> pd.DataFrame:
-    """Determines optimal time-varying weights for blending multiple forecast models.
+    """Get the blend weights for the forecast initialised at t0
 
-    This function calculates weights for combining various day-ahead and intraday models based
-    on their historical performance (MAE) and current operational delay. 
-    
-    We create a hierarchical blend where up to one model is chosen and blended into
-    pvnet_day_ahead. We also choose up to one intraday model to blend into the day-ahead blend.
-    
+    Loads the horizon-MAE curves, finds the current delay of each model from the Data
+    Platform, and calculates the blend weights. See `calculate_hierarchical_blend` for
+    how the blend is constructed.
+
     Args:
+        client: Data Platform client used to find the latest forecast for each model
         t0: The forecast initialisation time
         exclude_models: These models will not be included in the blend
 
     Returns:
-        A pandas DataFrame containing the optimal blend weights:
-        - Index: Forecast horizon relative to `t0` (pd.Timedelta).
-        - Columns: Names of the models included in the final blend (subset of
-          `DAY_AHEAD_MODEL_NAMES` and `INTRADAY_MODEL_NAMES`).
-        - Values: Float weights (between 0.0 and 1.0) assigned to each model
-          at each forecast horizon. At any given horizon, weights for available
-          models should sum approximately to 1.0. Weights will be NaN where a
-          model was inherently unavailable (e.g., NaN in its original MAE curve
-          at that horizon). Models excluded due to excessive delay or missing
-          MAE data will not appear as columns or will have zero/NaN weights.
+        A DataFrame of blend weights as returned by `calculate_hierarchical_blend`, but
+        indexed by target time (t0 + horizon) rather than forecast horizon
     """
-    
-    df_mae = get_horizon_maes()
 
-    if exclude_models is None:
-        all_model_names = [*ALL_MODEL_NAMES]
-    else:
-        all_model_names = [m for m in ALL_MODEL_NAMES if m not in exclude_models]
-        df_mae = df_mae.drop(columns=exclude_models)
+    all_candidate_models = set(ALL_MODEL_NAMES) - set(exclude_models or ())
+
+    df_mae = get_horizon_maes()
     
-    # We need to have MAE-horizon values for all potential models
-    assert len(set(all_model_names) - set(df_mae.columns))==0
+    if len(all_candidate_models - set(df_mae.columns))!=0:
+        skipped_models = all_candidate_models - set(df_mae.columns)
+        raise ValueError(
+            f"The following models are missing from the input DataFrame: {skipped_models}. "
+            "Please ensure that the input DataFrame contains MAE-horizon values for all models "
+            "under consideration."
+        )
     
-    # The maximum forecast horizon of any of the models
+    # The maximum forecast horizon across all models
     max_horizon = df_mae.index.max()
     
     # Find how delayed the most recent forecast of each model is
     df_latest_forecast_ids = await get_latest_forecast_metadata(
         client=client,
-        model_names=all_model_names, 
+        model_names=all_candidate_models, 
         t0=t0, 
         max_delay=max_horizon,
         location_type="national",
     )
+
+    # Candidate models which have not run recently will not appear in the delays dict, and so will
+    # be left out of the blend
     model_delays_dict = get_model_delays(df_latest_forecast_ids, t0)
 
-    # If the model has not run recently it will not appear in the recent forecasts in the database. 
-    # Therefore it will not appear in model_delays_dict. Add it with a delay of the maximum forecast 
-    # horizon so it will be present, but disregarded in further steps
-    model_delays_dict = {m: model_delays_dict.get(m, max_horizon) for m in all_model_names}
+    available_models = set(model_delays_dict)
 
-    # Construct the expected horizon-MAE values for each model run with the current delays
-    df_delayed_mae = delay_horizon_maes(df_mae, model_delays_dict)
+    if not available_models:
+        raise ValueError(
+            f"None of the candidate models {sorted(all_candidate_models)} have run recently, "
+            "so no blend can be made"
+        )
+    if not_run_recently := all_candidate_models - available_models:
+        logger.warning(
+            f"Models {sorted(not_run_recently)} have not run recently and will not be blended"
+        )
 
-    # Use the model with the longest forecast horizon as the backup model for the day-ahead blend
-    da_backup_model_name = infer_backup_model_name(df_delayed_mae[DAY_AHEAD_MODEL_NAMES])
-
-    # Calculate the optimal blend weights between day-ahead models
-    df_da_model_weights = calculate_optimal_blend_weights(
-        df_delayed_mae[DAY_AHEAD_MODEL_NAMES], 
-        backup_model_name=da_backup_model_name,
-        kernel=BLEND_KERNEL, 
-        score_func=make_avg_mae_func(36),
-    )
-        
-    # Calculate the expected horizon-MAE for the day-ahead blend computed above
-    mask = ~df_delayed_mae[all_model_names].isnull().all(axis=1)
-    df_delayed_mae["da_blend"] = (
-        df_da_model_weights.fillna(0)*df_delayed_mae[df_da_model_weights.columns]
-    ).sum(skipna=True, axis=1).where(mask)
-
-    # Calculate the optimal blend weights for blending the intraday models into the day-ahead blend
-    df_intraday_model_weights = calculate_optimal_blend_weights(
-        df_delayed_mae[all_model_names+["da_blend"]], 
-        backup_model_name="da_blend",
-        kernel=BLEND_KERNEL,
-        score_func=make_avg_mae_func(8),
+    df_blend_weights = calculate_hierarchical_blend(
+        df_mae=df_mae[sorted(available_models)],
+        model_delays_dict=model_delays_dict,
     )
 
-    # The day-ahead blend weights must be multiplied by how much we are using the day-ahead blend
-    # at each step
-    for col in df_da_model_weights.columns:
-        df_da_model_weights[col] = df_da_model_weights[col]*df_intraday_model_weights["da_blend"]
+    # Convert forecast horizons to target times
+    df_blend_weights.index = df_blend_weights.index + t0
 
-    df_intraday_model_weights = df_intraday_model_weights.drop(columns="da_blend")
-
-    df_all_weights = pd.concat([df_da_model_weights, df_intraday_model_weights], axis=1)
-
-    # Filter out any models which are not used in this blend
-    df_all_weights = df_all_weights.loc[:, df_all_weights.sum(axis=0) > 0]
-
-    # Shift the index to be relative to the forecast initialisation time
-    df_all_weights.index = df_all_weights.index + t0
-
-    return df_all_weights
+    return df_blend_weights
 
 
 def backfill_weights(df: pd.DataFrame, start_datetime: pd.Timestamp) -> pd.DataFrame:

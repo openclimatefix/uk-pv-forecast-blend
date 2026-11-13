@@ -685,6 +685,8 @@ async def get_blend_weights(
             f"Models {sorted(not_run_recently)} have not run recently and will not be blended"
         )
 
+    logger.info(f"Model delays: {model_delays_dict}")
+
     df_blend_weights = calculate_hierarchical_blend(
         df_mae=df_mae[sorted(available_models)],
         model_delays_dict=model_delays_dict,

@@ -5,6 +5,7 @@ Tests:
 3. test_get_blend_weights_cloud    - Blend weights handle excluded/intraday model combinations (parametrized)
 """
 
+import numpy as np
 import pandas as pd
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -12,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import time_machine
 from forecast_blend.weights import (
     ALL_MODEL_NAMES,
+    calculate_hierarchical_blend,
     infer_backup_model_name,
     get_horizon_maes,
     get_blend_weights,
@@ -23,7 +25,7 @@ def test_get_horizon_maes():
     df = get_horizon_maes()
     
     # Check all the expected models are present
-    assert set(ALL_MODEL_NAMES) - set(df.columns) == set()
+    assert len(ALL_MODEL_NAMES - set(df.columns))==0
 
 
 def test_infer_backup_model_name_prefers_longest_horizon_then_lowest_mae():
@@ -49,6 +51,31 @@ def test_infer_backup_model_name_returns_first_when_no_valid_mae():
     )
 
     assert infer_backup_model_name(df) == "a"
+
+
+def test_calculate_hierarchical_blend_zero_delays():
+    df_mae = get_horizon_maes()
+    model_delays_dict = {model: pd.Timedelta(0) for model in ALL_MODEL_NAMES}
+
+    df_weights = calculate_hierarchical_blend(df_mae, model_delays_dict)
+
+    # The blend is expected to include these three models
+    assert set(df_weights.columns) == set(["pvnet_v2", "pvnet_cloud", "pvnet_day_ahead"])
+
+    # Weights of the available models sum to 1 at every horizon
+    assert np.isclose(df_weights.sum(axis=1), 1).all()
+
+    # At the shortest horizon pvnet_v2 should have the highest weight
+    shortest = df_weights.iloc[0]
+    assert shortest.idxmax() == "pvnet_v2"
+
+    # At 3 hours the blend is all pvnet_cloud
+    weights_at_3hr = df_weights.loc[pd.Timedelta("3h")]
+    assert weights_at_3hr["pvnet_cloud"] == pytest.approx(1)
+
+    # Beyond 8 hours the blend is all pvnet_day_ahead
+    weights_after_8hr = df_weights.loc[df_weights.index > pd.Timedelta("8h")]
+    assert np.isclose(weights_after_8hr["pvnet_day_ahead"], 1).all()
 
 
 def _make_metadata_df(model_names, forecast_creation_time):
@@ -108,3 +135,4 @@ async def test_get_blend_weights_cloud(exclude_models, intraday_model):
 
     assert intraday_model in weights_df.columns or "pvnet_day_ahead" in weights_df.columns
     assert len(weights_df) > 0
+
